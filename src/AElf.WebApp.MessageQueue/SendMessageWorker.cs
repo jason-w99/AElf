@@ -92,8 +92,6 @@ public class SendMessageWorker : AsyncPeriodicBackgroundWorkerBase
             currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
         }
         
-        
-        
         var startCount = 0;
         while (IsContinue(startCount++, currentState.State))
         {

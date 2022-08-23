@@ -1,0 +1,62 @@
+using System;
+using System.Collections.Generic;
+using Volo.Abp.Data;
+using Volo.Abp.EventBus;
+
+namespace AElf.WebApp.MessageQueue;
+
+[EventName("AElf.WebMessage.BlockChainDataEto")]
+public class BlockChainDataEto : IBlockMessage
+{
+    public string ChainId { get; set; }
+    public List<BlockEto> Blocks {get;set;}
+    public long Height { get; }
+}
+public class BlockEto:IHasExtraProperties
+{
+    public long Height { get; }
+    public string BlockHash { get; set; }
+    public long BlockNumber { get; set; }
+    public string PreviousBlockHash { get; set; }
+    public DateTime BlockTime { get; set; }
+    public string SignerPubkey { get; set; }
+    public string Signature { get; set; }
+    //public Dictionary<string, string> ExtraProperties {get;set;}
+    public List<TransactionEto> Transactions{get;set;}
+    public ExtraPropertyDictionary ExtraProperties { get; }
+}
+
+public class TransactionEto:IHasExtraProperties
+{
+    public string TransactionId { get; set; }
+    
+    public string From { get; set; }
+    
+    public string To { get; set; }
+    
+    public string MethodName { get; set; }
+    
+    public string Params { get; set; }
+    
+    public string Signature { get; set; }
+    
+    public int Status { get; set; }
+    
+    public ExtraPropertyDictionary ExtraProperties {get;set;}
+    
+    public List<LogEventEto> LogEvents { get; set; }
+}
+public class LogEventEto:IHasExtraProperties
+{    
+    public string ContractAddress { get; set; }
+    
+    public string EventName { get; set; }
+    
+    /// <summary>
+    /// 事件在交易内的排序位置
+    /// </summary>
+    public int Index { get; set; }
+    
+    public ExtraPropertyDictionary ExtraProperties {get;set;}
+}
+

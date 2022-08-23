@@ -114,7 +114,6 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         var blockMessage = await _blockMessageEtoGenerator.GetBlockMessageEtoByHeightAsync(height, cts);
         if (blockMessage == null)
             return;
-
         blockMessageList.Add(blockMessage);
     }
 }
