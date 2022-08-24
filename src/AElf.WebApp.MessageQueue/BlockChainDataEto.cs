@@ -6,14 +6,15 @@ using Volo.Abp.EventBus;
 namespace AElf.WebApp.MessageQueue;
 
 [EventName("AElf.WebMessage.BlockChainDataEto")]
-public class BlockChainDataEto : IBlockMessage
+public class BlockChainDataEto
 {
     public string ChainId { get; set; }
     public List<BlockEto> Blocks {get;set;}
-    public long Height { get; }
+   
 }
-public class BlockEto:IHasExtraProperties
+public class BlockEto
 {
+    public string ChainId { get; set; }
     public long Height { get; }
     public string BlockHash { get; set; }
     public long BlockNumber { get; set; }
@@ -21,12 +22,12 @@ public class BlockEto:IHasExtraProperties
     public DateTime BlockTime { get; set; }
     public string SignerPubkey { get; set; }
     public string Signature { get; set; }
-    //public Dictionary<string, string> ExtraProperties {get;set;}
+    public Dictionary<string, string> ExtraProperties {get;set;}
     public List<TransactionEto> Transactions{get;set;}
-    public ExtraPropertyDictionary ExtraProperties { get; }
+    
 }
 
-public class TransactionEto:IHasExtraProperties
+public class TransactionEto
 {
     public string TransactionId { get; set; }
     
@@ -42,11 +43,11 @@ public class TransactionEto:IHasExtraProperties
     
     public int Status { get; set; }
     
-    public ExtraPropertyDictionary ExtraProperties {get;set;}
+    public  Dictionary<string, string>  ExtraProperties {get;set;}
     
     public List<LogEventEto> LogEvents { get; set; }
 }
-public class LogEventEto:IHasExtraProperties
+public class LogEventEto
 {    
     public string ContractAddress { get; set; }
     
@@ -57,6 +58,6 @@ public class LogEventEto:IHasExtraProperties
     /// </summary>
     public int Index { get; set; }
     
-    public ExtraPropertyDictionary ExtraProperties {get;set;}
+    public  Dictionary<string, string>  ExtraProperties {get;set;}
 }
 

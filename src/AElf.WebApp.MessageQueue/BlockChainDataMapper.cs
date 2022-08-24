@@ -8,7 +8,7 @@ using Volo.Abp.ObjectMapping;
 
 namespace AElf.WebApp.MessageQueue;
 
-public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockChainDataEto>,
+public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
     ITransientDependency
 {
     private readonly IAutoObjectMappingProvider _mapperProvider;
@@ -18,15 +18,13 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockChainDat
         _mapperProvider = mapperProvider;
     }
     
-    public BlockChainDataEto Map(BlockExecutedSet source)
+    public BlockEto Map(BlockExecutedSet source)
     {
         var block = source.Block;
         BlockChainDataEto blockChainDataEto = new BlockChainDataEto()
         {
-            ChainId = block.Header.ChainId.ToString()
+            ChainId =ChainHelper.ConvertChainIdToBase58(block.Header.ChainId)
         };
-        List<BlockEto> blocks = new List<BlockEto>();
-
 
         var blockHash = block.Header.GetHash();
         var blockHashStr = blockHash.ToHex();
@@ -39,16 +37,18 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockChainDat
             BlockNumber= blockHeight,
             PreviousBlockHash= block.Header.PreviousBlockHash.ToHex(),
             BlockTime=blockTime,
-            SignerPubkey=block.Header.SignerPubkey.ToHex(),
+            SignerPubkey=block.Header.SignerPubkey.ToByteArray().ToHex(false),
             Signature=block.Header.Signature.ToHex(),
         };
         //blockEto's extra properties
-        blockEto.SetProperty("Version",block.Header.Version);
-        blockEto.SetProperty("Bloom",block.Header.Bloom.ToHex());
-        blockEto.SetProperty("ExtraData",block.Header.ExtraData);
-        blockEto.SetProperty("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
-        blockEto.SetProperty("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfWorldState.ToHex());
-        
+        Dictionary<string, string> blockExtraProperties = new Dictionary<string, string>();
+        blockExtraProperties.Add("Version",block.Header.Version.ToString());
+        blockExtraProperties.Add("Bloom",block.Header.Bloom.ToBase64());
+        blockExtraProperties.Add("ExtraData",block.Header.ToString());
+        blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
+        blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfWorldState.ToHex());
+        blockEto.ExtraProperties = blockExtraProperties;
+
         List<TransactionEto> transactions = new List<TransactionEto>();
             
         foreach (var transactionResultKeyPair in source.TransactionResultMap)
@@ -65,18 +65,21 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockChainDat
                 From = transaction.From.ToBase58(),
                 To = transaction.To.ToBase58(),
                 MethodName= transaction.MethodName,
-                Params=transaction.Params.ToString(),
-                Signature=transaction.Signature.ToString(),
+                Params=transaction.Params.ToBase64(),
+                Signature=transaction.Signature.ToBase64(),
                 Status=(int)transactionResult.Status,
 
             };
             //TransactionEto's  extra properties
-            transactionEto.SetProperty("RefBlockNumber",transaction.RefBlockNumber);
-            transactionEto.SetProperty("RefBlockPrefix",transaction.RefBlockPrefix.ToHex());
-            transactionEto.SetProperty("Bloom",transactionResult.Bloom.ToHex());
-            transactionEto.SetProperty("ReturnValue",transactionResult.ReturnValue.ToHex());
-            transactionEto.SetProperty("Error",transactionResult.Error);
-            
+            Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
+            transactionExtraProperties.Add("Version",block.Header.Version.ToString());
+            transactionExtraProperties.Add("RefBlockNumber",transaction.RefBlockNumber.ToString());
+            transactionExtraProperties.Add("RefBlockPrefix",transaction.RefBlockPrefix.ToHex());
+            transactionExtraProperties.Add("Bloom",transactionResult.Bloom.ToBase64());
+            transactionExtraProperties.Add("ReturnValue",transactionResult.ReturnValue.ToHex());
+            transactionExtraProperties.Add("Error",transactionResult.Error);
+
+            transactionEto.ExtraProperties = transactionExtraProperties;
 
             List<LogEventEto> logEvents = new List<LogEventEto>();
             int index = 0;
@@ -91,8 +94,11 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockChainDat
                     
                 };
                 //logEventEto's  extra properties
-                logEventEto.SetProperty("Indexed", logEvent.Indexed);
-                logEventEto.SetProperty("NonIndexed", logEvent.NonIndexed.ToHex());
+                Dictionary<string, string> logEventEtoExtraProperties = new Dictionary<string, string>();
+                logEventEtoExtraProperties.Add("Indexed",logEvent.Indexed.ToString());
+                logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToHex());
+                logEventEto.ExtraProperties = logEventEtoExtraProperties;
+               
                 logEvents.Add(logEventEto);
                 index = index + 1;
             }
@@ -103,13 +109,10 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockChainDat
         }
 
         blockEto.Transactions = transactions;
-        
-        blocks.Add(blockEto);
-        blockChainDataEto.Blocks = blocks;
-        return blockChainDataEto;
+        return blockEto;
     }
 
-    public BlockChainDataEto Map(BlockExecutedSet source, BlockChainDataEto destination)
+    public BlockEto Map(BlockExecutedSet source, BlockEto destination)
     {
         throw new System.NotImplementedException();
     }

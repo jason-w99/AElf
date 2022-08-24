@@ -25,15 +25,15 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
 {
     private readonly IMessagePublishService _messagePublishService;
     private readonly ISyncBlockStateProvider _syncBlockStateProvider;
-    private readonly IBlockMessageEtoGenerator _blockMessageEtoGenerator;
+    private readonly IBlockChainDataEtoGenerator _blockChainDataEtoGenerator;
     private readonly ILogger _logger;
 
     public BlockMessageService(IMessagePublishService messagePublishService,
-        ISyncBlockStateProvider syncBlockStateProvider, IBlockMessageEtoGenerator blockMessageEtoGenerator, ILogger<BlockMessageService> logger)
+        ISyncBlockStateProvider syncBlockStateProvider, BlockChainDataEtoGenerator blockChainDataEtoGenerator, ILogger<BlockMessageService> logger)
     {
         _messagePublishService = messagePublishService;
         _syncBlockStateProvider = syncBlockStateProvider;
-        _blockMessageEtoGenerator = blockMessageEtoGenerator;
+        _blockChainDataEtoGenerator = blockChainDataEtoGenerator;
         _logger = logger;
     }
 
@@ -59,7 +59,7 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
     public async Task<long> SendMessageAsync(long from, long to, CancellationToken cts)
     {
         var queryTasks = new List<Task>();
-        var blockMessageList = new ConcurrentBag<IBlockMessage>();
+        var blockMessageList = new ConcurrentBag<BlockEto>();
         for (var i = from; i <= to; i++)
         {
             queryTasks.Add(QueryBlockMessageAsync(i, blockMessageList, cts));
@@ -108,10 +108,10 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         return heightIndex;
     }
     
-    private async Task QueryBlockMessageAsync(long height, ConcurrentBag<IBlockMessage> blockMessageList,
+    private async Task QueryBlockMessageAsync(long height, ConcurrentBag<BlockEto> blockMessageList,
         CancellationToken cts)
     {
-        var blockMessage = await _blockMessageEtoGenerator.GetBlockMessageEtoByHeightAsync(height, cts);
+        var blockMessage = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHeightAsync(height, cts);
         if (blockMessage == null)
             return;
         blockMessageList.Add(blockMessage);

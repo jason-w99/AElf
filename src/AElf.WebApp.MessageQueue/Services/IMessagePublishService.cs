@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AElf.Kernel.Blockchain;
@@ -12,29 +13,29 @@ namespace AElf.WebApp.MessageQueue.Services;
 public interface IMessagePublishService
 {
     Task<bool> PublishAsync(long height, CancellationToken cts);
-    Task<bool> PublishAsync(IBlockMessage blockMessage);
+    Task<bool> PublishAsync(BlockEto blockChainDataEto);
     Task<bool> PublishAsync(BlockExecutedSet blockExecutedSet);
 }
 
 public class MessagePublishService : IMessagePublishService, ITransientDependency
 {
-    private readonly IBlockMessageEtoGenerator _blockMessageEtoGenerator;
+    private readonly IBlockChainDataEtoGenerator _blockChainDataEtoGenerator;
     private readonly IDistributedEventBus _distributedEventBus;
     private readonly ILogger<MessagePublishService> _logger;
     private const string Asynchronous = "Asynchronous";
     private const string Synchronous = "Synchronous";
 
     public MessagePublishService(IDistributedEventBus distributedEventBus,
-        IBlockMessageEtoGenerator blockMessageEtoGenerator, ILogger<MessagePublishService> logger)
+        IBlockChainDataEtoGenerator blockChainDataEtoGenerator, ILogger<MessagePublishService> logger)
     {
         _distributedEventBus = distributedEventBus;
-        _blockMessageEtoGenerator = blockMessageEtoGenerator;
+        _blockChainDataEtoGenerator = blockChainDataEtoGenerator;
         _logger = logger;
     }
 
     public async Task<bool> PublishAsync(long height, CancellationToken cts)
     {
-        var blockMessageEto = await _blockMessageEtoGenerator.GetBlockMessageEtoByHeightAsync(height, cts);
+        var blockMessageEto = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHeightAsync(height, cts);
         if (blockMessageEto != null)
         {
             return await PublishAsync(blockMessageEto, Asynchronous);
@@ -45,21 +46,28 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
 
     public async Task<bool> PublishAsync(BlockExecutedSet blockExecutedSet)
     {
-        var blockMessageEto = _blockMessageEtoGenerator.GetBlockMessageEto(blockExecutedSet);
+        var blockMessageEto = _blockChainDataEtoGenerator.GetBlockMessageEto(blockExecutedSet);
         return await PublishAsync(blockMessageEto, Synchronous);
     }
 
-    public async Task<bool> PublishAsync(IBlockMessage message)
+    public async Task<bool> PublishAsync(BlockEto message)
     {
         return await PublishAsync(message, Asynchronous);
     }
 
-    private async Task<bool> PublishAsync(IBlockMessage message, string runningPattern)
+    private async Task<bool> PublishAsync(BlockEto message, string runningPattern)
     {
         _logger.LogInformation($"{runningPattern} Start publish block: {message.Height}.");
         try
         {
-            await _distributedEventBus.PublishAsync(message.GetType(), message);
+            List<BlockEto> blockEtos = new List<BlockEto>();
+            blockEtos.Add(message);
+            var blockChainDataEto = new BlockChainDataEto()
+            {
+                ChainId =message.ChainId,
+                Blocks = blockEtos
+            };
+            await _distributedEventBus.PublishAsync(blockChainDataEto.GetType(), blockChainDataEto);
             _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
             return true;
         }

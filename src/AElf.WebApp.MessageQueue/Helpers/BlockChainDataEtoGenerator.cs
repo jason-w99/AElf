@@ -15,7 +15,7 @@ using Volo.Abp.ObjectMapping;
 
 namespace AElf.WebApp.MessageQueue.Helpers;
 
-public class BlockChainDataEtoGenerator : IBlockMessageEtoGenerator
+public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
 {
     
     private readonly IBlockchainService _blockchainService;
@@ -36,133 +36,133 @@ public class BlockChainDataEtoGenerator : IBlockMessageEtoGenerator
     }
     
    
-    public async Task<IBlockMessage> GetBlockMessageEtoByHeightAsync(long height, CancellationToken cts)
+    public async Task<BlockEto> GetBlockMessageEtoByHeightAsync(long height, CancellationToken cts)
     {
-        var blocks = await GetBlockByHeightAsync(height);
-        if (blocks == null)
+        var block = await GetBlockByHeightAsync(height);
+        if (block == null)
         {
             _logger.LogWarning($"Failed to find block information, height: {height + 1}");
             return null;
         }
+        var blockHash = block.Header.GetHash();
+        var blockHashStr = blockHash.ToHex();
+        var blockHeight = block.Height;
+        var blockTime = block.Header.Time.ToDateTime();
         
-        var blockChainDataEto = new BlockChainDataEto
+        BlockEto blockEto = new BlockEto()
         {
-            ChainId = blocks[0].Header.ChainId.ToString()
+            BlockHash=blockHashStr,
+            BlockNumber= blockHeight,
+            PreviousBlockHash= block.Header.PreviousBlockHash.ToHex(),
+            BlockTime=blockTime,
+            SignerPubkey=block.Header.SignerPubkey.ToByteArray().ToHex(false),
+            Signature=block.Header.Signature.ToHex(),
         };
-        List<BlockEto> blockEtos = new List<BlockEto>();
-        foreach (var block in blocks)
+        //blockEto's extra properties
+        
+        Dictionary<string, string> blockExtraProperties = new Dictionary<string, string>();
+        blockExtraProperties.Add("Version",block.Header.Version.ToString());
+        blockExtraProperties.Add("Bloom",block.Header.Bloom.ToBase64());
+        blockExtraProperties.Add("ExtraData",block.Header.ToString());
+        blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
+        blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfWorldState.ToHex());
+        blockEto.ExtraProperties = blockExtraProperties;
+        //blockEto.SetVersion();
+        List<TransactionEto> transactions = new List<TransactionEto>();
+        
+        foreach (var txId in block.TransactionIds)
         {
-            var blockHash = block.Header.GetHash();
-            var blockHashStr = blockHash.ToHex();
-            var blockHeight = block.Height;
-            var blockTime = block.Header.Time.ToDateTime();
-            
-            BlockEto blockEto = new BlockEto()
+            if (cts.IsCancellationRequested)
             {
-                BlockHash=blockHashStr,
-                BlockNumber= blockHeight,
-                PreviousBlockHash= block.Header.PreviousBlockHash.ToHex(),
-                BlockTime=blockTime,
-                SignerPubkey=block.Header.SignerPubkey.ToHex(),
-                Signature=block.Header.Signature.ToHex(),
-            };
-            //blockEto's extra properties
-            blockEto.SetProperty("Version",block.Header.Version);
-            blockEto.SetProperty("Bloom",block.Header.Bloom.ToHex());
-            blockEto.SetProperty("ExtraData",block.Header.ExtraData);
-            blockEto.SetProperty("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
-            blockEto.SetProperty("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfWorldState.ToHex());
-            
-            //blockEto.SetVersion();
-            List<TransactionEto> transactions = new List<TransactionEto>();
-            
-            foreach (var txId in block.TransactionIds)
-            {
-                if (cts.IsCancellationRequested)
-                {
-                    return null;
-                }
-
-                var transactionResult = await _transactionResultQueryService.GetTransactionResultAsync(txId, blockHash);
-                if (transactionResult == null)
-                {
-                    _logger.LogWarning(
-                        $"Failed to find transactionResult, block hash: {blockHash},  transaction ID: {txId}");
-                    continue;
-                }
-
-                var transaction = await _transactionManager.GetTransactionAsync(txId);
-                if (transaction == null)
-                {
-                    _logger.LogWarning($"Failed to find transaction, block hash: {blockHash},  transaction ID: {txId}");
-                    continue;
-                }
-                TransactionEto transactionEto = new TransactionEto()
-                {
-                    TransactionId = txId.ToHex(),
-                    From = transaction.From.ToBase58(),
-                    To = transaction.To.ToBase58(),
-                    MethodName= transaction.MethodName,
-                    Params=transaction.Params.ToString(),
-                    Signature=transaction.Signature.ToString(),
-                    Status=(int)transactionResult.Status,
-
-                };
-                //TransactionEto's  extra properties
-                transactionEto.SetProperty("RefBlockNumber",transaction.RefBlockNumber);
-                transactionEto.SetProperty("RefBlockPrefix",transaction.RefBlockPrefix.ToHex());
-                transactionEto.SetProperty("Bloom",transactionResult.Bloom.ToHex());
-                transactionEto.SetProperty("ReturnValue",transactionResult.ReturnValue.ToHex());
-                transactionEto.SetProperty("Error",transactionResult.Error);
-                
-
-                List<LogEventEto> logEvents = new List<LogEventEto>();
-                int index = 0;
-                foreach (var logEvent in transactionResult.Logs)
-                {
-         
-                    LogEventEto logEventEto = new LogEventEto()
-                    {
-                        ContractAddress=logEvent.Address.ToBase58(),
-                        EventName=logEvent.Name,
-                        Index =index
-                        
-                    };
-                    //logEventEto's  extra properties
-                    logEventEto.SetProperty("Indexed", logEvent.Indexed);
-                    logEventEto.SetProperty("NonIndexed", logEvent.NonIndexed.ToHex());
-                    logEvents.Add(logEventEto);
-                    index = index + 1;
-                }
-
-                transactionEto.LogEvents = logEvents;
-                
-                transactions.Add(transactionEto);
+                return null;
             }
 
-            blockEto.Transactions = transactions;
-            blockEtos.Add(blockEto);
+            var transactionResult = await _transactionResultQueryService.GetTransactionResultAsync(txId, blockHash);
+            if (transactionResult == null)
+            {
+                _logger.LogWarning(
+                    $"Failed to find transactionResult, block hash: {blockHash},  transaction ID: {txId}");
+                continue;
+            }
+
+            var transaction = await _transactionManager.GetTransactionAsync(txId);
+            if (transaction == null)
+            {
+                _logger.LogWarning($"Failed to find transaction, block hash: {blockHash},  transaction ID: {txId}");
+                continue;
+            }
+            TransactionEto transactionEto = new TransactionEto()
+            {
+                TransactionId = txId.ToHex(),
+                From = transaction.From.ToBase58(),
+                To = transaction.To.ToBase58(),
+                MethodName= transaction.MethodName,
+                Params=transaction.Params.ToBase64(),
+                Signature=transaction.Signature.ToBase64(),
+                Status=(int)transactionResult.Status,
+
+            };
+            //TransactionEto's  extra properties
+            Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
+            transactionExtraProperties.Add("Version",block.Header.Version.ToString());
+            transactionExtraProperties.Add("RefBlockNumber",transaction.RefBlockNumber.ToString());
+            transactionExtraProperties.Add("RefBlockPrefix",transaction.RefBlockPrefix.ToHex());
+            transactionExtraProperties.Add("Bloom",transactionResult.Bloom.ToBase64());
+            transactionExtraProperties.Add("ReturnValue",transactionResult.ReturnValue.ToHex());
+            transactionExtraProperties.Add("Error",transactionResult.Error);
+
+            transactionEto.ExtraProperties = transactionExtraProperties;  
+
+            List<LogEventEto> logEvents = new List<LogEventEto>();
+            int index = 0;
+            foreach (var logEvent in transactionResult.Logs)
+            {
+     
+                LogEventEto logEventEto = new LogEventEto()
+                {
+                    ContractAddress=logEvent.Address.ToBase58(),
+                    EventName=logEvent.Name,
+                    Index =index
+                    
+                };
+                //logEventEto's  extra properties
+                Dictionary<string, string> logEventEtoExtraProperties = new Dictionary<string, string>();
+                logEventEtoExtraProperties.Add("Indexed",logEvent.Indexed.ToString());
+                logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToHex());
+                logEventEto.ExtraProperties = logEventEtoExtraProperties;
+               
+                logEvents.Add(logEventEto);
+                index = index + 1;
+            }
+
+            transactionEto.LogEvents = logEvents;
+            
+            transactions.Add(transactionEto);
         }
 
-
-        blockChainDataEto.Blocks = blockEtos;
+        blockEto.Transactions = transactions;
        
-        return blockChainDataEto;
+
+       
+        return blockEto;
     }
 
 
-    public IBlockMessage GetBlockMessageEto(BlockExecutedSet blockExecutedSet)
+    public BlockEto GetBlockMessageEto(BlockExecutedSet blockExecutedSet)
     {
-        return _objectMapper.Map<BlockExecutedSet, BlockChainDataEto>(blockExecutedSet);
+
+       return _objectMapper.Map<BlockExecutedSet, BlockEto>(blockExecutedSet);
+      
+        
     }
 
     
-    private async Task<List<Block>> GetBlockByHeightAsync(long height)
+    private async Task<Block> GetBlockByHeightAsync(long height)
     {
         var chain = await _blockchainService.GetChainAsync();
         var hash = await _blockchainService.GetBlockHashByHeightAsync(chain, height, chain.LongestChainHash);
-        var blocks = await _blockchainService.GetBlocksInLongestChainBranchAsync(hash, 2);
-        return blocks.Any() ? blocks: null;
+        var blocks = await _blockchainService.GetBlocksInLongestChainBranchAsync(hash, 1);
+        return blocks.Any() ? blocks.First(): null;
     }
 
    

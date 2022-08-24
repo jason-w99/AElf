@@ -33,7 +33,7 @@ public class MessageQueueAElfModule : AElfModule
         ConfigureRabbitMqEventBus(configuration);
         ConfigureCache();
         //context.Services.AddTransient<IBlockMessageEtoGenerator, TransactionListEtoGenerator>();
-        context.Services.AddTransient<IBlockMessageEtoGenerator, BlockChainDataEtoGenerator>();
+        context.Services.AddTransient<IBlockChainDataEtoGenerator, BlockChainDataEtoGenerator>();
     }
 
     private void ConfigureRabbitMqEventBus(IConfiguration configuration)
