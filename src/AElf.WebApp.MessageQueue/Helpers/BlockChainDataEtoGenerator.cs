@@ -39,9 +39,22 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
     public async Task<BlockEto> GetBlockMessageEtoByHeightAsync(long height, CancellationToken cts)
     {
         var block = await GetBlockByHeightAsync(height);
+        return await GetBlockMessageEtoByBlockAsync(block,cts.IsCancellationRequested);
+    }
+
+    public async Task<BlockEto> GetBlockMessageEtoByHashAsync(Hash blockId)
+    {
+        Block block = await _blockchainService.GetBlockByHashAsync(blockId);
+        
+        return await GetBlockMessageEtoByBlockAsync(block,false);
+    }
+
+    private async Task<BlockEto> GetBlockMessageEtoByBlockAsync(Block  block, bool isCancellationRequested )
+    {
+       
         if (block == null)
         {
-            _logger.LogWarning($"Failed to find block information, height: {height + 1}");
+            _logger.LogWarning($"Failed to find block information, height: {block.Height + 1}");
             return null;
         }
         var blockHash = block.Header.GetHash();
@@ -53,6 +66,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         {
             BlockHash=blockHashStr,
             BlockNumber= blockHeight,
+            PreviousBlockId=block.Header.PreviousBlockHash,
             PreviousBlockHash= block.Header.PreviousBlockHash.ToHex(),
             BlockTime=blockTime,
             SignerPubkey=block.Header.SignerPubkey.ToByteArray().ToHex(false),
@@ -72,7 +86,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         
         foreach (var txId in block.TransactionIds)
         {
-            if (cts.IsCancellationRequested)
+            if (isCancellationRequested)
             {
                 return null;
             }
@@ -134,19 +148,12 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
                 logEvents.Add(logEventEto);
                 index = index + 1;
             }
-
             transactionEto.LogEvents = logEvents;
-            
             transactions.Add(transactionEto);
         }
-
         blockEto.Transactions = transactions;
-       
-
-       
         return blockEto;
     }
-
 
     public BlockEto GetBlockMessageEto(BlockExecutedSet blockExecutedSet)
     {

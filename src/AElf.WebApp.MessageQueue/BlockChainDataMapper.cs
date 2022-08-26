@@ -35,6 +35,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         {
             BlockHash=blockHashStr,
             BlockNumber= blockHeight,
+            PreviousBlockId=block.Header.PreviousBlockHash,
             PreviousBlockHash= block.Header.PreviousBlockHash.ToHex(),
             BlockTime=blockTime,
             SignerPubkey=block.Header.SignerPubkey.ToByteArray().ToHex(false),

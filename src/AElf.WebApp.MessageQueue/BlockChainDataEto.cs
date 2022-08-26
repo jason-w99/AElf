@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AElf.Types;
 using Volo.Abp.Data;
 using Volo.Abp.EventBus;
 
@@ -17,6 +18,7 @@ public class BlockEto
     public string ChainId { get; set; }
     public long Height { get; }
     public string BlockHash { get; set; }
+    public Hash PreviousBlockId { get; set; }
     public long BlockNumber { get; set; }
     public string PreviousBlockHash { get; set; }
     public DateTime BlockTime { get; set; }

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AElf.Kernel.Blockchain;
 using AElf.WebApp.MessageQueue.Helpers;
+using AElf.WebApp.MessageQueue.Provider;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.EventBus.Distributed;
@@ -22,15 +23,17 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
     private readonly IBlockChainDataEtoGenerator _blockChainDataEtoGenerator;
     private readonly IDistributedEventBus _distributedEventBus;
     private readonly ILogger<MessagePublishService> _logger;
+    private readonly ISyncBlockStateProvider _syncBlockStateProvider;
     private const string Asynchronous = "Asynchronous";
     private const string Synchronous = "Synchronous";
 
     public MessagePublishService(IDistributedEventBus distributedEventBus,
-        IBlockChainDataEtoGenerator blockChainDataEtoGenerator, ILogger<MessagePublishService> logger)
+        IBlockChainDataEtoGenerator blockChainDataEtoGenerator, ILogger<MessagePublishService> logger, ISyncBlockStateProvider syncBlockStateProvider)
     {
         _distributedEventBus = distributedEventBus;
         _blockChainDataEtoGenerator = blockChainDataEtoGenerator;
         _logger = logger;
+        _syncBlockStateProvider = syncBlockStateProvider;
     }
 
     public async Task<bool> PublishAsync(long height, CancellationToken cts)
@@ -69,6 +72,13 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             };
             await _distributedEventBus.PublishAsync(blockChainDataEto.GetType(), blockChainDataEto);
             _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
+            //Added logic
+            //The hash needs to be stored in the cache after each transmission ，
+            await _syncBlockStateProvider.AddBlockHashAsync(message.BlockHash,message.PreviousBlockHash);
+            
+            await CheckBlockContinuous(message);
+            
+          
             return true;
         }
         catch (Exception e)
@@ -76,5 +86,25 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             _logger.LogError($"Failed to publish events to mq service.\n{e.Message}");
             return false;
         }
+    }
+
+    /// <summary>
+    ///    It also needs to check whether the previous block exists in the cache by hash of the previous block, and if it does not
+    ///    it keeps searching up (sending out every block that is not in the cache) until the query is reached
+    /// </summary>
+    /// <param name="blockEto"></param>
+    /// <exception cref="NotImplementedException"></exception>
+    private async Task CheckBlockContinuous(BlockEto blockEto)
+    {
+        var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        
+        if (!blockSyncState.SentBlockHashs.ContainsKey(blockEto.PreviousBlockHash))
+        {
+            //This block needs to be queried and sent
+            var blockMessageEto = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(blockEto.PreviousBlockId );
+            await PublishAsync(blockMessageEto, Asynchronous);
+        }
+        
+        throw new NotImplementedException();
     }
 }
