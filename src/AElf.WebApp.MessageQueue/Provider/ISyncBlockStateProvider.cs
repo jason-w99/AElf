@@ -18,6 +18,9 @@ public interface ISyncBlockStateProvider
     Task UpdateStateAsync(long? height, SyncState? state = null, SyncState? expectationState = null);
 
     Task AddBlockHashAsync(string blockHash, string preBlockHash);
+    Task DeleteBlockHashAsync(string blockHash);
+    
+    
 }
 
 public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDependency
@@ -112,6 +115,18 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
 
         _logger.LogInformation(
             $"BlockSyncState updated, blockHash: {blockHash}  preBlockHash: {preBlockHash}");
+    }
+
+    public async Task DeleteBlockHashAsync(string blockHash)
+    {
+        using (await SyncSemaphore.LockAsync())
+        {
+            _blockSyncStateInformation.SentBlockHashs.Remove(blockHash);
+            await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
+        }
+
+        _logger.LogInformation(
+            $"BlockSyncState delete SentBlockHashs before lib, blockHash: {blockHash} ");
     }
 }
 
