@@ -29,7 +29,7 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
     private readonly ILogger _logger;
 
     public BlockMessageService(IMessagePublishService messagePublishService,
-        ISyncBlockStateProvider syncBlockStateProvider, BlockChainDataEtoGenerator blockChainDataEtoGenerator, ILogger<BlockMessageService> logger)
+        ISyncBlockStateProvider syncBlockStateProvider, IBlockChainDataEtoGenerator blockChainDataEtoGenerator, ILogger<BlockMessageService> logger)
     {
         _messagePublishService = messagePublishService;
         _syncBlockStateProvider = syncBlockStateProvider;

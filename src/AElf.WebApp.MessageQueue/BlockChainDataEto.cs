@@ -16,7 +16,7 @@ public class BlockChainDataEto
 public class BlockEto
 {
     public string ChainId { get; set; }
-    public long Height { get; }
+    public long Height { get; set; }
     public string BlockHash { get; set; }
     public Hash PreviousBlockId { get; set; }
     public long BlockNumber { get; set; }

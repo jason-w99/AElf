@@ -1,0 +1,78 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using AElf.Kernel;
+using AElf.Kernel.Account.Application;
+using AElf.Kernel.Blockchain.Application;
+using AElf.OS;
+using AElf.OS.Node.Application;
+using AElf.Types;
+using AElf.WebApp.MessageQueue;
+using AElf.WebApp.MessageQueue.Helpers;
+using AElf.WebApp.MessageQueue.Provider;
+using AElf.WebApp.MessageQueue.Services;
+using AElf.WebApp.Web;
+using Microsoft.Extensions.DependencyInjection;
+using Moq;
+using Volo.Abp;
+using Volo.Abp.AspNetCore.TestBase;
+using Volo.Abp.Autofac;
+using Volo.Abp.EventBus;
+using Volo.Abp.Modularity;
+using Volo.Abp.Threading;
+
+namespace AElf.WebApp.Application.MessageQueue.Tests;
+
+
+[DependsOn(
+    typeof(AbpAutofacModule),
+    typeof(AbpAspNetCoreTestBaseModule),
+    typeof(MessageQueueAElfModule),
+    typeof(KernelCoreTestAElfModule),
+    typeof(AbpEventBusModule)
+)]
+public class TestModule: AbpModule
+{
+    public override void ConfigureServices(ServiceConfigurationContext context)
+    {
+        base.ConfigureServices(context);
+        var  services = context.Services;
+        //需要mock chain
+        //services.AddSingleton(p => Mock.Of<>());
+        services.AddDistributedMemoryCache();
+        services.AddSingleton<ISyncBlockStateProvider,SycTestProvider>();
+        services.AddSingleton<SendMessageServer>();
+        //services.AddSingleton<IBlockMessageService,BlockMessageService>();
+        
+        
+    }
+    public override void OnApplicationInitialization(ApplicationInitializationContext context)
+    {
+        var kernelTestHelper = context.ServiceProvider.GetService<KernelTestHelper>();
+        var chain = AsyncHelper.RunSync(() => kernelTestHelper!.MockChainAsync());
+       
+        var previousBlockHeader = kernelTestHelper.BestBranchBlockList.Last().Header;
+        var transactions =
+            kernelTestHelper.GenerateTransactions(3, previousBlockHeader.Height, previousBlockHeader.PreviousBlockHash);
+        var transactionResult=kernelTestHelper.GenerateTransactionResult(transactions[0],TransactionResultStatus.Mined);
+        var transactionResults = new List<TransactionResult>();
+        transactionResults.Add(transactionResult);
+        var height = previousBlockHeader.Height;
+        var previousHash = previousBlockHeader.PreviousBlockHash;
+        var forkBranchBlockList = new List<Block>();
+
+        for (int i = 0; i < 100; i++)
+        {
+            var newBlock =  AsyncHelper.RunSync(() =>  kernelTestHelper.AttachBlock(height,previousHash));
+            forkBranchBlockList.Add(newBlock);
+            height++;
+            previousHash = newBlock.GetHash();
+        }
+        kernelTestHelper.LongestBranchBlockList.AddRange(forkBranchBlockList);
+
+        var s=chain.LongestChainHeight;
+        var d=chain.BestChainHeight;
+
+    }
+    
+}

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using AElf.ContractDeployer;
 using AElf.Contracts.Genesis;
 using AElf.Database;
 using AElf.Kernel;
@@ -57,7 +58,8 @@ public class ContractTestModule<TSelf> : ContractTestModule
     typeof(SmartContractExecutionAElfModule),
     typeof(TransactionPoolAElfModule),
     typeof(ChainControllerAElfModule),
-    typeof(CSharpRuntimeAElfModule))]
+    typeof(CSharpRuntimeAElfModule),
+    typeof(ContractDeployerModule))]
 public class ContractTestModule : AbpModule
 {
     public int ChainId { get; } = ChainHelper.ConvertBase58ToChainId("AELF");

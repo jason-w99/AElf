@@ -1,44 +1,34 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using AElf.WebApp.MessageQueue;
 using AElf.WebApp.MessageQueue.Enum;
+using AElf.WebApp.MessageQueue.Provider;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Volo.Abp.Caching;
-using Volo.Abp.DependencyInjection;
 using Volo.Abp.Threading;
+using CollectionExtensions = Castle.Core.Internal.CollectionExtensions;
 
-namespace AElf.WebApp.MessageQueue.Provider;
+namespace AElf.WebApp.Application.MessageQueue.Tests;
 
-public interface ISyncBlockStateProvider
+public class SycTestProvider : ISyncBlockStateProvider
 {
-    Task InitializeAsync();
-    Task<SyncInformation> GetCurrentStateAsync();
-
-    Task UpdateStateAsync(long? height, SyncState? state = null, SyncState? expectationState = null);
-
-    Task AddBlockHashAsync(string blockHash, string preBlockHash);
-    Task DeleteBlockHashAsync(string blockHash);
     
-    
-}
-
-public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDependency
-{
     private SyncInformation _blockSyncStateInformation;
-    private const string BlockSyncState = "BlockSyncState";
+    private const string BlockSyncState = "BlockSyncStateTest";
+    //private readonly ICacheManager _cacheManager;
     private readonly IDistributedCache<SyncInformation> _distributedCache;
     private readonly MessageQueueOptions _messageQueueOptions;
-    private readonly ILogger<SyncBlockStateProvider> _logger;
     private readonly string _blockSynState;
     private SemaphoreSlim SyncSemaphore { get; }
 
-    public SyncBlockStateProvider(IDistributedCache<SyncInformation> distributedCache,
-        IOptionsSnapshot<MessageQueueOptions> messageQueueEnableOptions, ILogger<SyncBlockStateProvider> logger)
+    public SycTestProvider(IDistributedCache<SyncInformation> distributedCache,
+        IOptionsSnapshot<MessageQueueOptions> messageQueueEnableOptions)
     {
         _messageQueueOptions = messageQueueEnableOptions.Value;
         _distributedCache = distributedCache;
-        _logger = logger;
         SyncSemaphore = new SemaphoreSlim(1, 1);
         _blockSynState = $"{BlockSyncState}-{_messageQueueOptions.ClientName}";
     }
@@ -62,11 +52,10 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             _blockSyncStateInformation.CurrentHeight = _messageQueueOptions.StartPublishMessageHeight - 1;
         }
 
-        _blockSyncStateInformation.State = _messageQueueOptions.Enable ? SyncState.Prepared : SyncState.Stopped;
+        _blockSyncStateInformation.State =  SyncState.Prepared ;
         _blockSyncStateInformation.SentBlockHashs = new Dictionary<string, string>();
+        _blockSyncStateInformation.FirstSendBlockHash=String.Empty;
         
-        _logger.LogInformation(
-            $"BlockSyncState initialized, State: {_blockSyncStateInformation.State}  CurrentHeight: {_blockSyncStateInformation.CurrentHeight}");
     }
 
     public async Task<SyncInformation> GetCurrentStateAsync()
@@ -77,8 +66,9 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             currentData.State = _blockSyncStateInformation.State;
             currentData.CurrentHeight = _blockSyncStateInformation.CurrentHeight;
             currentData.SentBlockHashs = _blockSyncStateInformation.SentBlockHashs;
+            currentData.FirstSendBlockHash = _blockSyncStateInformation.FirstSendBlockHash;
+            
         }
-
         return currentData;
     }
 
@@ -91,30 +81,32 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             {
                 return;
             }
-
             _blockSyncStateInformation.State = state ?? _blockSyncStateInformation.State;
             _blockSyncStateInformation.CurrentHeight = height ?? _blockSyncStateInformation.CurrentHeight;
             dataToUpdate.State = _blockSyncStateInformation.State;
             dataToUpdate.CurrentHeight = _blockSyncStateInformation.CurrentHeight;
             dataToUpdate.SentBlockHashs = _blockSyncStateInformation.SentBlockHashs;
+            dataToUpdate.FirstSendBlockHash = _blockSyncStateInformation.FirstSendBlockHash;
             await _distributedCache.SetAsync(_blockSynState, dataToUpdate);
         }
 
-        _logger.LogInformation(
-            $"BlockSyncState updated, State: {dataToUpdate.State}  CurrentHeight: {dataToUpdate.CurrentHeight}");
+     
     }
     public async Task AddBlockHashAsync(string blockHash,string preBlockHash)
     {
         
         using (await SyncSemaphore.LockAsync())
         {
+            if (_blockSyncStateInformation.SentBlockHashs.IsNullOrEmpty() && CollectionExtensions.IsNullOrEmpty(_blockSyncStateInformation.FirstSendBlockHash))
+            {
+                _blockSyncStateInformation.FirstSendBlockHash = blockHash;
+            }
             _blockSyncStateInformation.SentBlockHashs.Add(blockHash,preBlockHash);
           
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
 
-        _logger.LogInformation(
-            $"BlockSyncState updated, blockHash: {blockHash}  preBlockHash: {preBlockHash}");
+      
     }
 
     public async Task DeleteBlockHashAsync(string blockHash)
@@ -125,17 +117,5 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
 
-        _logger.LogInformation(
-            $"BlockSyncState delete SentBlockHashs before lib, blockHash: {blockHash} ");
     }
-}
-
-public class SyncInformation
-{
-    public long CurrentHeight { get; set; }
-    public SyncState State { get; set; }
-    
-    public string  FirstSendBlockHash { get; set; }
-
-    public Dictionary<string, string> SentBlockHashs { set; get; }
 }

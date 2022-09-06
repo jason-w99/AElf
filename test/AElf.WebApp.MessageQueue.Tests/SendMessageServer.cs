@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using AElf.WebApp.MessageQueue;
 using AElf.WebApp.MessageQueue.Enum;
 using AElf.WebApp.MessageQueue.Provider;
 using AElf.WebApp.MessageQueue.Services;
@@ -9,62 +10,32 @@ using Microsoft.Extensions.Options;
 using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.Threading;
 
-namespace AElf.WebApp.MessageQueue;
+namespace AElf.WebApp.Application.MessageQueue.Tests;
 
-public class SendMessageWorker : AsyncPeriodicBackgroundWorkerBase
+
+public class SendMessageServer
 {
-    private readonly ISyncBlockStateProvider _syncBlockStateProvider;
+     private readonly ISyncBlockStateProvider _syncBlockStateProvider;
+     private readonly IBlockMessageService _blockMessageService;
     private readonly ISyncBlockLatestHeightProvider _latestHeightProvider;
     protected CancellationToken CancellationToken { get; set; }
     private int _blockCount;
     private int _parallelCount;
 
-    public SendMessageWorker(ISyncBlockStateProvider syncBlockStateProvider, AbpAsyncTimer timer,
+    public SendMessageServer(ISyncBlockStateProvider syncBlockStateProvider, AbpAsyncTimer timer,
         IServiceScopeFactory serviceScopeFactory, IOptionsSnapshot<MessageQueueOptions> option,
-        ISyncBlockLatestHeightProvider latestHeightProvider) : base(timer,
-        serviceScopeFactory)
+        ISyncBlockLatestHeightProvider latestHeightProvider, IBlockMessageService blockMessageService)
     {
         _syncBlockStateProvider = syncBlockStateProvider;
         _latestHeightProvider = latestHeightProvider;
+        _blockMessageService = blockMessageService;
         _blockCount = option.Value.BlockCountPerPeriod;
         _parallelCount = option.Value.ParallelCount;
-        Timer.Period = option.Value.Period;
-        timer.RunOnStart = true;
     }
 
-    public void SetWork(int? period, int? blockCountPerPeriod, int? parallelCount)
+
+    public  async Task DoWorkAsync()
     {
-        if (period.HasValue)
-        {
-            Timer.Period = period.Value;
-        }
-
-        if (blockCountPerPeriod.HasValue)
-        {
-            _blockCount = blockCountPerPeriod.Value;
-        }
-
-        if (parallelCount.HasValue)
-        {
-            _parallelCount = parallelCount.Value;
-        }
-    }
-
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        await base.StartAsync(cancellationToken);
-        CancellationToken = cancellationToken;
-    }
-
-    public Task StopTimerAsync(CancellationToken cancellationToken = default)
-    {
-        Timer.Stop(cancellationToken);
-        return Task.CompletedTask;
-    }
-
-    protected override async Task DoWorkAsync(PeriodicBackgroundWorkerContext workerContext)
-    {
-        var blockMessageService = workerContext.ServiceProvider.GetRequiredService<IBlockMessageService>();
         var currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
         var nextHeight = currentState.CurrentHeight;
 
@@ -80,7 +51,7 @@ public class SendMessageWorker : AsyncPeriodicBackgroundWorkerBase
                 break;
             }
             
-            var syncBlockHeight = await blockMessageService.SendMessageAsync(startHeight, endHeight, CancellationToken);
+            var syncBlockHeight = await _blockMessageService.SendMessageAsync(startHeight, endHeight, CancellationToken);
             if (syncBlockHeight <= 0)
             {
                 await PreparedToSyncMessageAsync();
@@ -102,7 +73,7 @@ public class SendMessageWorker : AsyncPeriodicBackgroundWorkerBase
                 break;
             }
             
-            if (await blockMessageService.SendMessageAsync(nextHeight, CancellationToken))
+            if (await _blockMessageService.SendMessageAsync(nextHeight, CancellationToken))
             {
                 nextHeight++;
             }

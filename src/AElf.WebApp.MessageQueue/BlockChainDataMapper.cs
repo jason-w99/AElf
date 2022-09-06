@@ -47,68 +47,76 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         blockExtraProperties.Add("Bloom",block.Header.Bloom.ToBase64());
         blockExtraProperties.Add("ExtraData",block.Header.ToString());
         blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
-        blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfWorldState.ToHex());
+        blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
         blockEto.ExtraProperties = blockExtraProperties;
 
         List<TransactionEto> transactions = new List<TransactionEto>();
-            
-        foreach (var transactionResultKeyPair in source.TransactionResultMap)
+        if (Equals(source.TransactionResultMap!=null))
         {
-            var txId = transactionResultKeyPair.Key.ToHex();
-            var transactionResult = transactionResultKeyPair.Value;
-            if (!source.TransactionMap.TryGetValue(transactionResultKeyPair.Key, out var transaction))
+            foreach (var transactionResultKeyPair in source.TransactionResultMap)
             {
-                continue;
-            }
-            TransactionEto transactionEto = new TransactionEto()
-            {
-                TransactionId = txId,
-                From = transaction.From.ToBase58(),
-                To = transaction.To.ToBase58(),
-                MethodName= transaction.MethodName,
-                Params=transaction.Params.ToBase64(),
-                Signature=transaction.Signature.ToBase64(),
-                Status=(int)transactionResult.Status,
-
-            };
-            //TransactionEto's  extra properties
-            Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
-            transactionExtraProperties.Add("Version",block.Header.Version.ToString());
-            transactionExtraProperties.Add("RefBlockNumber",transaction.RefBlockNumber.ToString());
-            transactionExtraProperties.Add("RefBlockPrefix",transaction.RefBlockPrefix.ToHex());
-            transactionExtraProperties.Add("Bloom",transactionResult.Bloom.ToBase64());
-            transactionExtraProperties.Add("ReturnValue",transactionResult.ReturnValue.ToHex());
-            transactionExtraProperties.Add("Error",transactionResult.Error);
-
-            transactionEto.ExtraProperties = transactionExtraProperties;
-
-            List<LogEventEto> logEvents = new List<LogEventEto>();
-            int index = 0;
-            foreach (var logEvent in transactionResult.Logs)
-            {
-     
-                LogEventEto logEventEto = new LogEventEto()
+                var txId = transactionResultKeyPair.Key.ToHex();
+                var transactionResult = transactionResultKeyPair.Value;
+                if (!source.TransactionMap.TryGetValue(transactionResultKeyPair.Key, out var transaction))
                 {
-                    ContractAddress=logEvent.Address.ToBase58(),
-                    EventName=logEvent.Name,
-                    Index =index
-                    
+                    continue;
+                }
+                TransactionEto transactionEto = new TransactionEto()
+                {
+                    TransactionId = txId,
+                    From = transaction.From.ToBase58(),
+                    To = transaction.To.ToBase58(),
+                    MethodName= transaction.MethodName,
+                    Params=transaction.Params.ToBase64(),
+                    Signature=transaction.Signature.ToBase64(),
+                    Status=(int)transactionResult.Status,
+
                 };
-                //logEventEto's  extra properties
-                Dictionary<string, string> logEventEtoExtraProperties = new Dictionary<string, string>();
-                logEventEtoExtraProperties.Add("Indexed",logEvent.Indexed.ToString());
-                logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToHex());
-                logEventEto.ExtraProperties = logEventEtoExtraProperties;
-               
-                logEvents.Add(logEventEto);
-                index = index + 1;
+                //TransactionEto's  extra properties
+                Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
+                transactionExtraProperties.Add("Version",block.Header.Version.ToString());
+                transactionExtraProperties.Add("RefBlockNumber",transaction.RefBlockNumber.ToString());
+                transactionExtraProperties.Add("RefBlockPrefix",transaction.RefBlockPrefix.ToHex());
+                transactionExtraProperties.Add("Bloom",transactionResult.Bloom.ToBase64());
+                transactionExtraProperties.Add("ReturnValue",transactionResult.ReturnValue.ToHex());
+                transactionExtraProperties.Add("Error",transactionResult.Error);
+
+                transactionEto.ExtraProperties = transactionExtraProperties;
+
+                List<LogEventEto> logEvents = new List<LogEventEto>();
+                int index = 0;
+                if (transactionResult.Logs!=null)
+                {
+                    foreach (var logEvent in transactionResult.Logs)
+                    {
+         
+                        LogEventEto logEventEto = new LogEventEto()
+                        {
+                            ContractAddress=logEvent.Address.ToBase58(),
+                            EventName=logEvent.Name,
+                            Index =index
+                        
+                        };
+                        //logEventEto's  extra properties
+                        Dictionary<string, string> logEventEtoExtraProperties = new Dictionary<string, string>();
+                        logEventEtoExtraProperties.Add("Indexed",logEvent.Indexed.ToString());
+                        logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToHex());
+                        logEventEto.ExtraProperties = logEventEtoExtraProperties;
+                   
+                        logEvents.Add(logEventEto);
+                        index = index + 1;
+                    }
+
+                    
+                }
+                
+                transactionEto.LogEvents = logEvents;
+                
+                transactions.Add(transactionEto);
             }
 
-            transactionEto.LogEvents = logEvents;
-            
-            transactions.Add(transactionEto);
         }
-
+        
         blockEto.Transactions = transactions;
         return blockEto;
     }

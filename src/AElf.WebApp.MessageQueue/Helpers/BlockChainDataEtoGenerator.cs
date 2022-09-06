@@ -64,6 +64,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         
         BlockEto blockEto = new BlockEto()
         {
+            Height=blockHeight,
             BlockHash=blockHashStr,
             BlockNumber= blockHeight,
             PreviousBlockId=block.Header.PreviousBlockHash,
@@ -79,7 +80,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         blockExtraProperties.Add("Bloom",block.Header.Bloom.ToBase64());
         blockExtraProperties.Add("ExtraData",block.Header.ToString());
         blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
-        blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfWorldState.ToHex());
+        blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
         blockEto.ExtraProperties = blockExtraProperties;
         //blockEto.SetVersion();
         List<TransactionEto> transactions = new List<TransactionEto>();

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AElf.Kernel.Blockchain;
+using AElf.Types;
 using AElf.WebApp.MessageQueue.Helpers;
 using AElf.WebApp.MessageQueue.Provider;
 using Microsoft.Extensions.Logging;
@@ -98,13 +99,14 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
     {
         var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         
-        if (!blockSyncState.SentBlockHashs.ContainsKey(blockEto.PreviousBlockHash))
+        if (!blockSyncState.SentBlockHashs.ContainsKey(blockEto.PreviousBlockHash) && blockEto.PreviousBlockId!=Hash.Empty 
+               // &&  blockEto.BlockHash!=blockSyncState.FirstSendBlockHash
+            )
         {
             //This block needs to be queried and sent
             var blockMessageEto = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(blockEto.PreviousBlockId );
             await PublishAsync(blockMessageEto, Asynchronous);
         }
         
-        throw new NotImplementedException();
     }
 }
