@@ -33,6 +33,8 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
             
         BlockEto blockEto = new BlockEto()
         {
+            Height = blockHeight,
+            ChainId = ChainHelper.ConvertChainIdToBase58(block.Header.ChainId),
             BlockHash=blockHashStr,
             BlockNumber= blockHeight,
             PreviousBlockId=block.Header.PreviousBlockHash,
@@ -53,6 +55,8 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         List<TransactionEto> transactions = new List<TransactionEto>();
         if (Equals(source.TransactionResultMap!=null))
         {
+            Dictionary<Hash, TransactionResult> temp = new Dictionary<Hash, TransactionResult>();
+            //foreach (var transactionResultKeyPair in temp)
             foreach (var transactionResultKeyPair in source.TransactionResultMap)
             {
                 var txId = transactionResultKeyPair.Key.ToHex();
@@ -114,7 +118,6 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                 
                 transactions.Add(transactionEto);
             }
-
         }
         
         blockEto.Transactions = transactions;

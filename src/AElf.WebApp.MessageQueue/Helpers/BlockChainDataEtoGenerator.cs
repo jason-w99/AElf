@@ -64,6 +64,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         
         BlockEto blockEto = new BlockEto()
         {
+            ChainId = ChainHelper.ConvertChainIdToBase58(block.Header.ChainId),
             Height=blockHeight,
             BlockHash=blockHashStr,
             BlockNumber= blockHeight,

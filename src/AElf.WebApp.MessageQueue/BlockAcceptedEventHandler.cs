@@ -72,7 +72,7 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
         await _blockMessageService.SendMessageAsync(eventData.BlockExecutedSet);
     }
 
-    private async Task PreparedToRunAsync(BlockAcceptedEvent eventData)
+    public async Task PreparedToRunAsync(BlockAcceptedEvent eventData)
     {
         await _sendMessageByDesignateHeightTaskManager.StopAsync();
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
@@ -91,7 +91,7 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
         }
     }
 
-    private async Task AsyncPreparedToRun(BlockAcceptedEvent eventData)
+    public async Task AsyncPreparedToRun(BlockAcceptedEvent eventData)
     {
         await _sendMessageByDesignateHeightTaskManager.StopAsync();
         var currentHeight = eventData.Block.Height;

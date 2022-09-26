@@ -55,7 +55,7 @@ public class TestModule: AbpModule
         var transactions =
             kernelTestHelper.GenerateTransactions(3, previousBlockHeader.Height, previousBlockHeader.PreviousBlockHash);
         var transactionResult=kernelTestHelper.GenerateTransactionResult(transactions[0],TransactionResultStatus.Mined);
-        var transactionResults = new List<TransactionResult>();
+        /*var transactionResults = new List<TransactionResult>();
         transactionResults.Add(transactionResult);
         var height = previousBlockHeader.Height;
         var previousHash = previousBlockHeader.PreviousBlockHash;
@@ -68,7 +68,7 @@ public class TestModule: AbpModule
             height++;
             previousHash = newBlock.GetHash();
         }
-        kernelTestHelper.LongestBranchBlockList.AddRange(forkBranchBlockList);
+        kernelTestHelper.LongestBranchBlockList.AddRange(forkBranchBlockList);*/
 
         var s=chain.LongestChainHeight;
         var d=chain.BestChainHeight;

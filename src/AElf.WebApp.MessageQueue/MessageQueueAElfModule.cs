@@ -24,7 +24,7 @@ using Volo.Abp.Threading;
 namespace AElf.WebApp.MessageQueue;
 
 [DependsOn(typeof(AbpAutoMapperModule), 
-     typeof(AbpEventBusRabbitMqModule), 
+     //typeof(AbpEventBusRabbitMqModule), 
      typeof(CoreApplicationWebAppAElfModule),
      typeof(AbpCachingModule),
      typeof(AbpCachingStackExchangeRedisModule)
@@ -35,13 +35,14 @@ public class MessageQueueAElfModule : AElfModule
     {
         var configuration = context.Services.GetConfiguration();
         Configure<AbpAutoMapperOptions>(options => { options.AddMaps<MessageQueueAElfModule>(); });
-        Configure<MessageQueueOptions>(options => { configuration.GetSection("MessageQueue").Bind(options); });
-        ConfigureRabbitMqEventBus(configuration);
+        /*Configure<MessageQueueOptions>(options => { configuration.GetSection("MessageQueue").Bind(options); });
+        ConfigureRabbitMqEventBus(configuration);*/
         ConfigureCache();
         context.Services.AddTransient<IBlockMessageEtoGenerator, TransactionListEtoGenerator>();
         context.Services.AddTransient<IBlockChainDataEtoGenerator, BlockChainDataEtoGenerator>();
     }
 
+     /*
      private void ConfigureRabbitMqEventBus(IConfiguration configuration)
      {
          Configure<AbpRabbitMqEventBusOptions>(options =>
@@ -72,6 +73,8 @@ public class MessageQueueAElfModule : AElfModule
               options.Connections.Default.Uri = new Uri(messageQueueConfig.GetSection("Uri").Value);
           });
      }
+     */
+     
 
      private void ConfigureCache()
      {
