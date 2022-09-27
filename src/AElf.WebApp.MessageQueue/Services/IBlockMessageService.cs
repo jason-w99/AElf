@@ -95,8 +95,7 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
                 break;
             }
 
-            var temp = heightIndex + 1;
-            if (message.Height == temp && await _messagePublishService.PublishAsync(message))
+            if (message.Height == heightIndex + 1 && await _messagePublishService.PublishAsync(message))
             {
                 await _syncBlockStateProvider.UpdateStateAsync(message.Height);
                 heightIndex = message.Height;

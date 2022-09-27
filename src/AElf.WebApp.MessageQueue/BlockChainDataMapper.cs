@@ -55,8 +55,6 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         List<TransactionEto> transactions = new List<TransactionEto>();
         if (Equals(source.TransactionResultMap!=null))
         {
-            Dictionary<Hash, TransactionResult> temp = new Dictionary<Hash, TransactionResult>();
-            //foreach (var transactionResultKeyPair in temp)
             foreach (var transactionResultKeyPair in source.TransactionResultMap)
             {
                 var txId = transactionResultKeyPair.Key.ToHex();

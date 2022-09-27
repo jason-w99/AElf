@@ -31,48 +31,31 @@ namespace AElf.WebApp.Application.MessageQueue.Tests;
     typeof(KernelCoreTestAElfModule),
     typeof(AbpEventBusModule)
 )]
-public class TestModule: AbpModule
+public class TestModule : AbpModule
 {
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         base.ConfigureServices(context);
-        var  services = context.Services;
+        var services = context.Services;
         //需要mock chain
         //services.AddSingleton(p => Mock.Of<>());
         services.AddDistributedMemoryCache();
-        services.AddSingleton<ISyncBlockStateProvider,SycTestProvider>();
+        services.AddSingleton<ISyncBlockStateProvider, SycTestProvider>();
         services.AddSingleton<SendMessageServer>();
         //services.AddSingleton<IBlockMessageService,BlockMessageService>();
-        
-        
     }
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
     {
         var kernelTestHelper = context.ServiceProvider.GetService<KernelTestHelper>();
         var chain = AsyncHelper.RunSync(() => kernelTestHelper!.MockChainAsync());
-       
         var previousBlockHeader = kernelTestHelper.BestBranchBlockList.Last().Header;
         var transactions =
             kernelTestHelper.GenerateTransactions(3, previousBlockHeader.Height, previousBlockHeader.PreviousBlockHash);
-        var transactionResult=kernelTestHelper.GenerateTransactionResult(transactions[0],TransactionResultStatus.Mined);
-        /*var transactionResults = new List<TransactionResult>();
-        transactionResults.Add(transactionResult);
-        var height = previousBlockHeader.Height;
-        var previousHash = previousBlockHeader.PreviousBlockHash;
-        var forkBranchBlockList = new List<Block>();
-
-        for (int i = 0; i < 100; i++)
-        {
-            var newBlock =  AsyncHelper.RunSync(() =>  kernelTestHelper.AttachBlock(height,previousHash));
-            forkBranchBlockList.Add(newBlock);
-            height++;
-            previousHash = newBlock.GetHash();
-        }
-        kernelTestHelper.LongestBranchBlockList.AddRange(forkBranchBlockList);*/
-
-        var s=chain.LongestChainHeight;
-        var d=chain.BestChainHeight;
+        var transactionResult =
+            kernelTestHelper.GenerateTransactionResult(transactions[0], TransactionResultStatus.Mined);
 
     }
-    
+
+
+
 }
