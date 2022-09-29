@@ -85,7 +85,8 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         blockEto.ExtraProperties = blockExtraProperties;
         //blockEto.SetVersion();
         List<TransactionEto> transactions = new List<TransactionEto>();
-        
+        int transactionIndex = 0;
+        int eventIndex = 0;
         foreach (var txId in block.TransactionIds)
         {
             if (isCancellationRequested)
@@ -116,8 +117,9 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
                 Params=transaction.Params.ToBase64(),
                 Signature=transaction.Signature.ToBase64(),
                 Status=(int)transactionResult.Status,
-
+                Index = transactionIndex
             };
+            transactionIndex += 1;
             //TransactionEto's  extra properties
             Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
             transactionExtraProperties.Add("Version",block.Header.Version.ToString());
@@ -130,7 +132,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
             transactionEto.ExtraProperties = transactionExtraProperties;  
 
             List<LogEventEto> logEvents = new List<LogEventEto>();
-            int index = 0;
+            
             foreach (var logEvent in transactionResult.Logs)
             {
      
@@ -138,7 +140,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
                 {
                     ContractAddress=logEvent.Address.ToBase58(),
                     EventName=logEvent.Name,
-                    Index =index
+                    Index =eventIndex
                     
                 };
                 //logEventEto's  extra properties
@@ -148,7 +150,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
                 logEventEto.ExtraProperties = logEventEtoExtraProperties;
                
                 logEvents.Add(logEventEto);
-                index = index + 1;
+                eventIndex += 1;
             }
             transactionEto.LogEvents = logEvents;
             transactions.Add(transactionEto);
