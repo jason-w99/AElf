@@ -55,6 +55,9 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         List<TransactionEto> transactions = new List<TransactionEto>();
         if (Equals(source.TransactionResultMap!=null))
         {
+            
+            int transactionIndex = 0;
+            int eventIndex = 0;
             foreach (var transactionResultKeyPair in source.TransactionResultMap)
             {
                 var txId = transactionResultKeyPair.Key.ToHex();
@@ -72,8 +75,10 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                     Params=transaction.Params.ToBase64(),
                     Signature=transaction.Signature.ToBase64(),
                     Status=(int)transactionResult.Status,
+                    Index = transactionIndex
 
                 };
+                transactionIndex += 1;
                 //TransactionEto's  extra properties
                 Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
                 transactionExtraProperties.Add("Version",block.Header.Version.ToString());
@@ -86,7 +91,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                 transactionEto.ExtraProperties = transactionExtraProperties;
 
                 List<LogEventEto> logEvents = new List<LogEventEto>();
-                int index = 0;
+                
                 if (transactionResult.Logs!=null)
                 {
                     foreach (var logEvent in transactionResult.Logs)
@@ -96,7 +101,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                         {
                             ContractAddress=logEvent.Address.ToBase58(),
                             EventName=logEvent.Name,
-                            Index =index
+                            Index =eventIndex
                         
                         };
                         //logEventEto's  extra properties
@@ -106,7 +111,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                         logEventEto.ExtraProperties = logEventEtoExtraProperties;
                    
                         logEvents.Add(logEventEto);
-                        index = index + 1;
+                        eventIndex += 1;
                     }
 
                     

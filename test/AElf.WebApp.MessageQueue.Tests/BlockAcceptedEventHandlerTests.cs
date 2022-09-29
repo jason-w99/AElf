@@ -87,14 +87,16 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         blockExecutedSet.Block = block;
         blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
 
-        await _blockAcceptedEventHandler.PreparedToRunAsync(blockAcceptedEvent);
+        await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.Prepared);
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent);
         
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.AsyncRunning);
         
         // 3.SyncPrepared
-         
-        await _blockAcceptedEventHandler.AsyncPreparedToRun(blockAcceptedEvent); 
+        
+        await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.SyncPrepared);
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
         blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.Prepared);
     }
@@ -110,13 +112,12 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         Block block = _kernelTestHelper.GenerateBlock(1,presHash);
         blockExecutedSet.Block = block;
         blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
-
-        await _blockAcceptedEventHandler.PreparedToRunAsync(blockAcceptedEvent);
+        await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.Prepared);
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent);
         
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncRunning);
-        
-      
+    
     }
 
     
@@ -131,8 +132,8 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         blockExecutedSet.Block = block;
         blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
         // 3.SyncPrepared
-         
-        await _blockAcceptedEventHandler.AsyncPreparedToRun(blockAcceptedEvent); 
+        await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.SyncPrepared);
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncRunning);
         blockSyncState.SentBlockHashs.Count.ShouldBeGreaterThanOrEqualTo(9);

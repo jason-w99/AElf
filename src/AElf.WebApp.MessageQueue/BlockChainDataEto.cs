@@ -45,6 +45,8 @@ public class TransactionEto
     
     public int Status { get; set; }
     
+    public int Index { get; set; }
+    
     public  Dictionary<string, string>  ExtraProperties {get;set;}
     
     public List<LogEventEto> LogEvents { get; set; }
