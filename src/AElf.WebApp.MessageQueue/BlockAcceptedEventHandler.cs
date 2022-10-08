@@ -56,7 +56,7 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
         }
 
         _latestHeightProvider.SetLatestHeight(eventData.Block.Height);
-    }
+        }
 
     private async Task StopAsync()
     {

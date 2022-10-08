@@ -11,7 +11,9 @@ using AElf.WebApp.MessageQueue.Provider;
 using AElf.WebApp.MessageQueue.Services;
 using Shouldly;
 using Volo.Abp.EventBus.Local;
+using Volo.Abp.Uow;
 using Xunit;
+using NewIrreversibleBlockFoundEventHandler = AElf.WebApp.MessageQueue.NewIrreversibleBlockFoundEventHandler;
 
 namespace AElf.WebApp.Application.MessageQueue.Tests;
 
@@ -26,6 +28,8 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
     private readonly ISendMessageByDesignateHeightTaskManager _sendMessageByDesignateHeightTaskManager;
     private readonly BlockAcceptedEventHandler _blockAcceptedEventHandler;
     private readonly SendMessageServer _sendMessageServer;
+    private readonly NewIrreversibleBlockFoundEventHandler _newIrreversibleBlockFoundEventHandler;
+
 
     public BlockAcceptedEventHandlerTests()
     {
@@ -37,10 +41,100 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         _eventBus = GetRequiredService<ILocalEventBus>();
         _blockAcceptedEventHandler = GetRequiredService<BlockAcceptedEventHandler>();
         _sendMessageServer = GetRequiredService<SendMessageServer>();
+        _newIrreversibleBlockFoundEventHandler = GetRequiredService<NewIrreversibleBlockFoundEventHandler>();
     }
 
-   
+    /// <summary>
+    /// Node push status: Initialization status Confirm - Prepared
+    /// </summary>
+    [Fact]
+    public async Task Test_01()
+    {
+        _syncBlockLatestHeightProvider.SetLatestHeight(100);
+        BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
+        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
+        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
+        Block block = _kernelTestHelper.GenerateBlock(100,presHash);
+        blockExecutedSet.Block = block;
+        blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
+        
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.Prepared);
+        //_syncBlockLatestHeightProvider.GetLatestHeight().ShouldBe(100);
+    }
+    
+    [Fact]
+    public async Task Test_03()
+    {
+        // 2.Prepared
+        BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
+        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
+        
+        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
+        Block block = _kernelTestHelper.GenerateBlock(99,presHash);
+        blockExecutedSet.Block = block;
+        blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
+        await _syncBlockStateProvider.UpdateStateAsync(99);
+        /*var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.Prepared);
+        */
+        
+        //await _syncBlockStateProvider.UpdateStateAsync(99);
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent);
+        
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.SyncRunning);
+        
+        
+    }
 
+    [Fact]
+    public async Task Test_04()
+    {
+        BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
+        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
+        
+        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
+        Block block = _kernelTestHelper.GenerateBlock(199,presHash);
+        blockExecutedSet.Block = block;
+        blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
+        await _syncBlockStateProvider.UpdateStateAsync(99);
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent);
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.AsyncRunning);
+        
+        
+    }
+    
+    
+    [Fact]
+    public async Task Test_05()
+    {
+        _syncBlockLatestHeightProvider.SetLatestHeight(189);
+        await _syncBlockStateProvider.UpdateStateAsync(199,SyncState.AsyncRunning);
+        await  _sendMessageServer.DoWorkAsync();
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
+    } 
+    
+    [Fact]
+    public async Task Test_10()
+    {
+        BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
+        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
+        
+        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
+        Block block = _kernelTestHelper.GenerateBlock(188,presHash);
+        blockExecutedSet.Block = block;
+        blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
+
+        await _syncBlockStateProvider.UpdateStateAsync(99, SyncState.SyncPrepared);
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.Prepared);
+    }
+    
     /// <summary>
     ///  from to test
     /// </summary>
@@ -87,7 +181,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         blockExecutedSet.Block = block;
         blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
 
-        await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.Prepared);
+        //await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.Prepared);
         await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent);
         
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
@@ -122,25 +216,24 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
 
     
     [Fact]
-    public async Task Handle_Event_TestC_Async()
+    public async Task Test_11()
     {
         BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
         BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
         
         var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
-        Block block = _kernelTestHelper.GenerateBlock(9,presHash);
+        Block block = _kernelTestHelper.GenerateBlock(10,presHash);
         blockExecutedSet.Block = block;
         blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
         // 3.SyncPrepared
-        await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.SyncPrepared);
+        await _syncBlockStateProvider.UpdateStateAsync(1, SyncState.SyncPrepared);
         await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncRunning);
-        blockSyncState.SentBlockHashs.Count.ShouldBeGreaterThanOrEqualTo(9);
     }
     
     [Fact]
-    public async Task Miss_send_Test()
+    public async Task Test_12()
     {
         BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
         
@@ -162,4 +255,49 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         isTrue.ShouldBe(true);
     }
 
+    
+    /// <summary>
+    /// Function test: The synchronous message is sent successfully
+    /// </summary>
+    [Fact]
+    public async Task Test_13()
+    {
+        await _syncBlockStateProvider.UpdateStateAsync(100, SyncState.SyncRunning);
+         _syncBlockLatestHeightProvider.SetLatestHeight(100);
+        BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
+        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
+        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
+        Block block = _kernelTestHelper.GenerateBlock(100,presHash);
+        blockExecutedSet.Block = block;
+        blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
+        
+        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.CurrentHeight.ShouldBe(101);
+        _syncBlockLatestHeightProvider.GetLatestHeight().ShouldBe(101);
+    }
+    
+    
+    /// <summary>
+    /// Functional test: Delete the BlockHash cached below LIB after reaching LIB
+    /// </summary>
+    [Fact]
+    public async Task Test_14()
+    {
+        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
+        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
+        Block block = _kernelTestHelper.GenerateBlock(9,presHash);
+        blockExecutedSet.Block = block;
+        await _blockMessageService.SendMessageAsync(blockExecutedSet);
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.SentBlockHashs.Count.ShouldBeGreaterThan(10);
+
+        NewIrreversibleBlockFoundEvent _event = new NewIrreversibleBlockFoundEvent();
+        _event.PreviousIrreversibleBlockHash = presHash;
+        _newIrreversibleBlockFoundEventHandler.HandleEventAsync(_event);
+        
+        blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.SentBlockHashs.Count.ShouldBe(1);
+
+    }
 }

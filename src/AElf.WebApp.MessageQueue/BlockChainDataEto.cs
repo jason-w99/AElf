@@ -6,7 +6,7 @@ using Volo.Abp.EventBus;
 
 namespace AElf.WebApp.MessageQueue;
 
-[EventName("AElf.WebMessage.BlockChainDataEto")]
+[EventName("AElf.WebApp.MessageQueue.BlockChainDataEto")]
 public class BlockChainDataEto
 {
     public string ChainId { get; set; }

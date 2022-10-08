@@ -52,7 +52,7 @@ public class SycTestProvider : ISyncBlockStateProvider
             _blockSyncStateInformation.CurrentHeight = _messageQueueOptions.StartPublishMessageHeight - 1;
         }
 
-        _blockSyncStateInformation.State =  SyncState.Prepared ;
+        _blockSyncStateInformation.State = _messageQueueOptions.Enable ? SyncState.Prepared : SyncState.Stopped;
         _blockSyncStateInformation.SentBlockHashs = new Dictionary<string, string>();
         _blockSyncStateInformation.FirstSendBlockHash=String.Empty;
         

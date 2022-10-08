@@ -47,8 +47,10 @@ public class TestModule : AbpModule
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
     {
         var kernelTestHelper = context.ServiceProvider.GetService<KernelTestHelper>();
+        var chain = AsyncHelper.RunSync(() => kernelTestHelper.MockChainAsync());
+
+        
         var previousBlockHeader = kernelTestHelper.BestBranchBlockList.Last().Header;
-        var chain1 = AsyncHelper.RunSync(() => kernelTestHelper.MockChainAsync());
         //var chain = AsyncHelper.RunSync(() => MockChainAsync(kernelTestHelper));
         var transactions =
             kernelTestHelper.GenerateTransactions(3, previousBlockHeader.Height, previousBlockHeader.PreviousBlockHash);

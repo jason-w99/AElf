@@ -9,7 +9,7 @@ public class MessageQueueOptions
     public string ExchangeName { get; set; } = "AElfExchange";
     public string UserName { get; set; } = "aelf";
     public string PassWord { get; set; } = "12345678";
-    public long StartPublishMessageHeight { get; set; }
+    public long StartPublishMessageHeight { get; set; } = 100;
     public int Period { get; set; } = 1000;
     public int BlockCountPerPeriod = 3;
     public int ParallelCount = 10;
