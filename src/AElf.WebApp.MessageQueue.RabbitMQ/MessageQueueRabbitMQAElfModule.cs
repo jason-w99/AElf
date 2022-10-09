@@ -26,7 +26,6 @@ public class MessageQueueRabbitMQAElfModule: AElfModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var configuration = context.Services.GetConfiguration();
-        Configure<MessageQueueOptions>(options => { configuration.GetSection("RabbitMQ").Bind(options); });
         ConfigureRabbitMqEventBus(configuration);
        
     }
@@ -35,20 +34,20 @@ public class MessageQueueRabbitMQAElfModule: AElfModule
      {
          Configure<AbpRabbitMqEventBusOptions>(options =>
          {
-             var messageQueueConfig = configuration.GetSection("RabbitMQ");
-             options.ClientName = messageQueueConfig.GetSection("ClientName").Value;
-             options.ExchangeName = messageQueueConfig.GetSection("ExchangeName").Value;
+             var rabbitMqConfig = configuration.GetSection("RabbitMQ");
+             options.ClientName = rabbitMqConfig.GetSection("ClientName").Value;
+             options.ExchangeName = rabbitMqConfig.GetSection("ExchangeName").Value;
          });
     
          Configure<AbpRabbitMqOptions>(options =>
          {
-            var messageQueueConfig = configuration.GetSection("MessageQueue");
-              var hostName = messageQueueConfig.GetSection("HostName").Value;
+            var rabbitMqConfig = configuration.GetSection("RabbitMQ");
+              var hostName = rabbitMqConfig.GetSection("HostName").Value;
          
               options.Connections.Default.HostName = hostName;
-              options.Connections.Default.Port = int.Parse(messageQueueConfig.GetSection("Port").Value);
-              options.Connections.Default.UserName = messageQueueConfig.GetSection("UserName").Value;
-              options.Connections.Default.Password = messageQueueConfig.GetSection("Password").Value;
+              options.Connections.Default.Port = int.Parse(rabbitMqConfig.GetSection("Port").Value);
+              options.Connections.Default.UserName = rabbitMqConfig.GetSection("UserName").Value;
+              options.Connections.Default.Password = rabbitMqConfig.GetSection("Password").Value;
               options.Connections.Default.Ssl = new SslOption
               {
                   Enabled = true,
@@ -58,7 +57,7 @@ public class MessageQueueRabbitMQAElfModule: AElfModule
                                            SslPolicyErrors.RemoteCertificateChainErrors
               };
               options.Connections.Default.VirtualHost = "/";
-              options.Connections.Default.Uri = new Uri(messageQueueConfig.GetSection("Uri").Value);
+              options.Connections.Default.Uri = new Uri(rabbitMqConfig.GetSection("Uri").Value);
           });
      }
      
