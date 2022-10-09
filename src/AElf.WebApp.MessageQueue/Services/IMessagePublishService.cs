@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AElf.Kernel.Blockchain;
@@ -15,7 +16,8 @@ namespace AElf.WebApp.MessageQueue.Services;
 public interface IMessagePublishService
 {
     Task<bool> PublishAsync(long height, CancellationToken cts);
-    Task<bool> PublishAsync(BlockEto blockChainDataEto);
+    Task<bool> PublishAsync(BlockEto blockEto);
+    Task<bool> PublishListAsync(BlockChainDataEto blockChainDataEto);
     Task<bool> PublishAsync(BlockExecutedSet blockExecutedSet);
 }
 
@@ -48,6 +50,33 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         return false;
     }
 
+    public async Task<bool> PublishListAsync(BlockChainDataEto blockChainDataEto)
+    {
+        _logger.LogInformation($"PublishList Start publish block: {blockChainDataEto.Blocks.First().Height} ~{blockChainDataEto.Blocks.Last().Height }.");
+        try
+        {
+            Dictionary<string, string> blocksHash = new Dictionary<string, string>();
+            foreach (var block in blockChainDataEto.Blocks)
+            {
+                var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+                if (!blockSyncState.SentBlockHashs.ContainsKey(block.PreviousBlockHash) )
+                {
+                    var preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.PreviousBlockId );
+                    await PublishAsync(preBlock, Asynchronous);
+                }
+                blocksHash.Add(block.BlockHash,block.PreviousBlockHash);
+            }
+            await _syncBlockStateProvider.AddBlocksHashAsync(blocksHash);
+            await _distributedEventBus.PublishAsync(blockChainDataEto);
+            return true;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError($"Failed to publish events to mq service.\n{e.Message}");
+            return false;
+        }
+    }
+
     public async Task<bool> PublishAsync(BlockExecutedSet blockExecutedSet)
     {
         var blockMessageEto = _blockChainDataEtoGenerator.GetBlockMessageEto(blockExecutedSet);
@@ -64,22 +93,24 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         _logger.LogInformation($"{runningPattern} Start publish block: {message.Height}.");
         try
         {
-            List<BlockEto> blockEtos = new List<BlockEto>();
-            blockEtos.Add(message);
-            var blockChainDataEto = new BlockChainDataEto()
+            var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+            while (IsContinue(message,blockSyncState))
             {
-                ChainId =message.ChainId,
-                Blocks = blockEtos
-            };
-            await _distributedEventBus.PublishAsync(blockChainDataEto.GetType(), blockChainDataEto);
-            _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
-            //Added logic
-            //The hash needs to be stored in the cache after each transmission ，
-            await _syncBlockStateProvider.AddBlockHashAsync(message.BlockHash,message.PreviousBlockHash);
-            
-            await CheckBlockContinuous(message);
-            
-          
+                List<BlockEto> blockEtos = new List<BlockEto>();
+                blockEtos.Add(message);
+                var blockChainDataEto = new BlockChainDataEto()
+                {
+                    ChainId =message.ChainId,
+                    Blocks = blockEtos
+                };
+                await _distributedEventBus.PublishAsync(blockChainDataEto);
+                _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
+                //Added logic
+                //The hash needs to be stored in the cache after each transmission ，
+                await _syncBlockStateProvider.AddBlockHashAsync(message.BlockHash,message.PreviousBlockHash);
+                message = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(message.PreviousBlockId );
+                blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+            }
             return true;
         }
         catch (Exception e)
@@ -89,7 +120,14 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         }
     }
 
-    /// <summary>
+    private bool IsContinue(BlockEto blockEto,SyncInformation blockSyncState)
+    {
+        
+        return !blockSyncState.SentBlockHashs.ContainsKey(blockEto.PreviousBlockHash) &&
+               blockEto.PreviousBlockId != Hash.Empty;
+    }
+
+    /*/// <summary>
     ///    It also needs to check whether the previous block exists in the cache by hash of the previous block, and if it does not
     ///    it keeps searching up (sending out every block that is not in the cache) until the query is reached
     /// </summary>
@@ -108,5 +146,5 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             await PublishAsync(blockMessageEto, Asynchronous);
         }
         
-    }
+    }*/
 }

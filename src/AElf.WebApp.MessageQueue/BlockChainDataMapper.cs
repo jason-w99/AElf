@@ -53,7 +53,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         blockEto.ExtraProperties = blockExtraProperties;
 
         List<TransactionEto> transactions = new List<TransactionEto>();
-        if (Equals(source.TransactionResultMap!=null))
+        if (source.TransactionResultMap!=null)
         {
             
             int transactionIndex = 0;
@@ -74,7 +74,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                     MethodName= transaction.MethodName,
                     Params=transaction.Params.ToBase64(),
                     Signature=transaction.Signature.ToBase64(),
-                    Status=(int)transactionResult.Status,
+                    Status=transactionResult.Status,
                     Index = transactionIndex
 
                 };
@@ -107,7 +107,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                         //logEventEto's  extra properties
                         Dictionary<string, string> logEventEtoExtraProperties = new Dictionary<string, string>();
                         logEventEtoExtraProperties.Add("Indexed",logEvent.Indexed.ToString());
-                        logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToHex());
+                        logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToString());
                         logEventEto.ExtraProperties = logEventEtoExtraProperties;
                    
                         logEvents.Add(logEventEto);

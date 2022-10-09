@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AElf.WebApp.MessageQueue.Enum;
@@ -18,6 +19,7 @@ public interface ISyncBlockStateProvider
     Task UpdateStateAsync(long? height, SyncState? state = null, SyncState? expectationState = null);
 
     Task AddBlockHashAsync(string blockHash, string preBlockHash);
+    Task AddBlocksHashAsync(Dictionary<string, string> blocksHash);
     Task DeleteBlockHashAsync(string blockHash);
     
     
@@ -40,7 +42,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         _distributedCache = distributedCache;
         _logger = logger;
         SyncSemaphore = new SemaphoreSlim(1, 1);
-        _blockSynState = $"{BlockSyncState}-{_messageQueueOptions.ClientName}";
+        _blockSynState = $"{BlockSyncState}-{_messageQueueOptions.ChainId}";
     }
 
     public async Task InitializeAsync()
@@ -108,15 +110,29 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         
         using (await SyncSemaphore.LockAsync())
         {
+            if (_blockSyncStateInformation.SentBlockHashs.IsNullOrEmpty() && string.IsNullOrEmpty(_blockSyncStateInformation.FirstSendBlockHash))
+            {
+                _blockSyncStateInformation.FirstSendBlockHash = blockHash;
+            }
             _blockSyncStateInformation.SentBlockHashs.Add(blockHash,preBlockHash);
-          
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
 
         _logger.LogInformation(
-            $"BlockSyncState updated, blockHash: {blockHash}  preBlockHash: {preBlockHash}");
+            $"BlockSyncState AddBlockHashAsync, blockHash: {blockHash}  preBlockHash: {preBlockHash}");
     }
 
+    public async Task AddBlocksHashAsync(Dictionary<string, string> blocksHash)
+    {
+        using (await SyncSemaphore.LockAsync())
+        {
+            _blockSyncStateInformation.SentBlockHashs= _blockSyncStateInformation.SentBlockHashs.Union(blocksHash).ToDictionary(k => k.Key, v => v.Value);
+          
+            await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
+        }
+        _logger.LogInformation(
+            $"BlockSyncState AddBlocksHashAsync ");
+    }
     public async Task DeleteBlockHashAsync(string blockHash)
     {
         using (await SyncSemaphore.LockAsync())

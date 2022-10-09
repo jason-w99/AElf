@@ -63,7 +63,7 @@ public class SendMessageServer
             currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
         }
         
-        var startCount = 0;
+        var startCount = 1;
         while (IsContinue(startCount++, currentState.State))
         {
             var latestHeight = _latestHeightProvider.GetLatestHeight();

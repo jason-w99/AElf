@@ -58,8 +58,7 @@ public class ContractTestModule<TSelf> : ContractTestModule
     typeof(SmartContractExecutionAElfModule),
     typeof(TransactionPoolAElfModule),
     typeof(ChainControllerAElfModule),
-    typeof(CSharpRuntimeAElfModule),
-    typeof(ContractDeployerModule))]
+    typeof(CSharpRuntimeAElfModule))]
 public class ContractTestModule : AbpModule
 {
     public int ChainId { get; } = ChainHelper.ConvertBase58ToChainId("AELF");

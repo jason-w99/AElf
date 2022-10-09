@@ -43,7 +43,7 @@ public class TransactionEto
     
     public string Signature { get; set; }
     
-    public int Status { get; set; }
+    public AElf.Types.TransactionResultStatus Status { get; set; }
     
     public int Index { get; set; }
     

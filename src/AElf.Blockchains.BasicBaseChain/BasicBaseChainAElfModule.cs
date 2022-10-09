@@ -59,8 +59,7 @@ namespace AElf.Blockchains.BasicBaseChain;
     typeof(ExecutionPluginForMethodFeeModule),
     typeof(ExecutionPluginForResourceFeeModule),
     typeof(ExecutionPluginForCallThresholdModule),
-    
-    typeof(MessageQueueRabbitMQAElfModule)
+    typeof(MessageQueueAElfModule)
 )]
 public class BasicBaseChainAElfModule : AElfModule
 {

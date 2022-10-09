@@ -26,7 +26,7 @@ public class MessageQueueRabbitMQAElfModule: AElfModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var configuration = context.Services.GetConfiguration();
-        Configure<MessageQueueOptions>(options => { configuration.GetSection("MessageQueue").Bind(options); });
+        Configure<MessageQueueOptions>(options => { configuration.GetSection("RabbitMQ").Bind(options); });
         ConfigureRabbitMqEventBus(configuration);
        
     }
@@ -35,7 +35,7 @@ public class MessageQueueRabbitMQAElfModule: AElfModule
      {
          Configure<AbpRabbitMqEventBusOptions>(options =>
          {
-             var messageQueueConfig = configuration.GetSection("MessageQueue");
+             var messageQueueConfig = configuration.GetSection("RabbitMQ");
              options.ClientName = messageQueueConfig.GetSection("ClientName").Value;
              options.ExchangeName = messageQueueConfig.GetSection("ExchangeName").Value;
          });

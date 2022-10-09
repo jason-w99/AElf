@@ -116,7 +116,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
                 MethodName= transaction.MethodName,
                 Params=transaction.Params.ToBase64(),
                 Signature=transaction.Signature.ToBase64(),
-                Status=(int)transactionResult.Status,
+                Status=transactionResult.Status,
                 Index = transactionIndex
             };
             transactionIndex += 1;
@@ -146,7 +146,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
                 //logEventEto's  extra properties
                 Dictionary<string, string> logEventEtoExtraProperties = new Dictionary<string, string>();
                 logEventEtoExtraProperties.Add("Indexed",logEvent.Indexed.ToString());
-                logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToHex());
+                logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToString());
                 logEventEto.ExtraProperties = logEventEtoExtraProperties;
                
                 logEvents.Add(logEventEto);

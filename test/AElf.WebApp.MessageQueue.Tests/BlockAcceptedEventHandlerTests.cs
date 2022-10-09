@@ -107,7 +107,9 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         
     }
     
-    
+    /// <summary>
+    /// Node push status: state switch -Asyncrunning -> SyncPrepared : Cache height >= incoming height -3
+    /// </summary>
     [Fact]
     public async Task Test_05()
     {
@@ -117,6 +119,58 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
+    
+    /// <summary>
+    /// Node push status: state switch -Asyncrunning -> SyncPrepared : The height of the block to be sent is not equal to the height to be fetched
+    /// </summary>
+    [Fact]
+    public async Task Test_06()
+    {
+        _syncBlockLatestHeightProvider.SetLatestHeight(189);
+        await _syncBlockStateProvider.UpdateStateAsync(199,SyncState.AsyncRunning);
+        await  _sendMessageServer.DoWorkAsync();
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
+    } 
+    
+    /// <summary>
+    /// Node push status: state switch -Asyncrunning -> SyncPrepared : Number of blocks to send is 0
+    /// </summary>
+    [Fact]
+    public async Task Test_07()
+    {
+        _syncBlockLatestHeightProvider.SetLatestHeight(200);
+        await _syncBlockStateProvider.UpdateStateAsync(99,SyncState.AsyncRunning);
+        await  _sendMessageServer.DoWorkAsync();
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
+    } 
+
+    /// <summary>
+    /// Node push status: state switch -Asyncrunning -> SyncPrepared :Cache height > The incoming height  -4
+    /// </summary>
+    [Fact]
+    public async Task Test_08()
+    {
+        _syncBlockLatestHeightProvider.SetLatestHeight(_kernelTestHelper.BestBranchBlockList.Last().Height);
+        await _syncBlockStateProvider.UpdateStateAsync(1,SyncState.AsyncRunning);
+        await  _sendMessageServer.DoWorkAsync();
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
+    } 
+
+    /*/// <summary>
+    /// Node push status: state switch -Asyncrunning -> SyncPrepared :The received height is blockMessageEto == null
+    /// </summary>
+    [Fact]
+    public async Task Test_09()
+    {
+        _syncBlockLatestHeightProvider.SetLatestHeight(_kernelTestHelper.BestBranchBlockList.Last().Height);
+        await _syncBlockStateProvider.UpdateStateAsync(1,SyncState.AsyncRunning);
+        await  _sendMessageServer.DoWorkAsync();
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
+    } */
     
     [Fact]
     public async Task Test_10()
@@ -145,76 +199,9 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         var syncBlockHeight = await _blockMessageService.SendMessageAsync(2, 6, cancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         syncBlockHeight.ShouldBe(7);
-        /*List<BlockChainDataEto> eventData = new List<BlockChainDataEto>();
-        _eventBus.Subscribe<BlockChainDataEto>(d =>
-        {
-            eventData.Add(d);
-            return Task.CompletedTask;
-        });
-        foreach (var eto in eventData)
-        {
-            
-        }*/
-    }
-    
-   
-    [Fact]
-    public async Task Worker_Test()
-    {
-        _syncBlockLatestHeightProvider.SetLatestHeight(_kernelTestHelper.BestBranchBlockList.Last().Height);
-        await _syncBlockStateProvider.UpdateStateAsync(1,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync();
-        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
-        blockSyncState.SentBlockHashs.Count.ShouldBeGreaterThanOrEqualTo(90);
-    } 
-    
-    [Fact]
-    public async Task Handle_Event_TestA_Async()
-    {
-        // 2.Prepared
-        BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
-        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
         
-        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
-        Block block = _kernelTestHelper.GenerateBlock(15,presHash);
-        blockExecutedSet.Block = block;
-        blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
-
-        //await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.Prepared);
-        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent);
-        
-        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.State.ShouldBe(SyncState.AsyncRunning);
-        
-        // 3.SyncPrepared
-        
-        await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.SyncPrepared);
-        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
-        blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.State.ShouldBe(SyncState.Prepared);
-    }
-   
-    [Fact]
-    public async Task Handle_Event_TestB_Async()
-    {
-        // 2.Prepared
-        BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
-        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
-        
-        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
-        Block block = _kernelTestHelper.GenerateBlock(1,presHash);
-        blockExecutedSet.Block = block;
-        blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
-        await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.Prepared);
-        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent);
-        
-        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.State.ShouldBe(SyncState.SyncRunning);
-    
     }
 
-    
     [Fact]
     public async Task Test_11()
     {

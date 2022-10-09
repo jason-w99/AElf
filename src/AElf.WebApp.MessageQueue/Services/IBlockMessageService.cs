@@ -65,8 +65,8 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
             queryTasks.Add(QueryBlockMessageAsync(i, blockMessageList, cts));
         }
 
-        await queryTasks.WhenAll();
-        if (!blockMessageList.Any())
+        //await queryTasks.WhenAll();
+        if (blockMessageList==null || !blockMessageList.Any())
         {
             _logger.LogError($"Failed to query message from: {from + 1} to: {to + 1}, 0 messages found");
             return -1;
@@ -77,6 +77,8 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         _logger.LogInformation(queryHeightLog.ToString());
         var sortedMessageQuery = blockMessageList.OrderBy(b => b.Height);
         long heightIndex = 0;
+        BlockChainDataEto blockChainDataEto = new BlockChainDataEto();
+        List<BlockEto> blockEto = new List<BlockEto>();
         foreach (var message in sortedMessageQuery)
         {
             if (heightIndex == 0)
@@ -95,14 +97,28 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
                 break;
             }
 
-            if (message.Height == heightIndex + 1 && await _messagePublishService.PublishAsync(message))
+            //if (message.Height == heightIndex + 1 && await _messagePublishService.PublishAsync(message))
+            if (message.Height == heightIndex + 1 )
             {
+                blockEto.Add(message);
                 await _syncBlockStateProvider.UpdateStateAsync(message.Height);
                 heightIndex = message.Height;
                 continue;
             }
+            
 
             break;
+        }
+
+        if (heightIndex!=-1)
+        {
+            blockChainDataEto.ChainId = blockEto.First().ChainId;
+            blockChainDataEto.Blocks = blockEto;
+            var isSuccess=await _messagePublishService.PublishListAsync(blockChainDataEto);
+            if (!isSuccess)
+            {
+                return -1;
+            }
         }
 
         return heightIndex;

@@ -273,26 +273,6 @@ public class KernelTestHelper
         return bestBranchBlockList;
     }
 
-    private async Task<List<Block>> AddAnotherBestBranch()
-    {
-        var bestBranchBlockList = new List<Block>();
-
-        for (var i = 0; i < 100; i++)
-        {
-            var chain = await _blockchainService.GetChainAsync();
-            var newBlock = await AttachBlock(chain.BestChainHeight, chain.BestChainHash);
-            bestBranchBlockList.Add(newBlock);
-
-            var chainBlockLink = await _chainManager.GetChainBlockLinkAsync(newBlock.GetHash());
-            await _chainManager.SetChainBlockLinkExecutionStatusAsync(chainBlockLink,
-                ChainBlockLinkExecutionStatus.ExecutionSuccess);
-
-            chain = await _blockchainService.GetChainAsync();
-            await _blockchainService.SetBestChainAsync(chain, newBlock.Height, newBlock.GetHash());
-        }
-
-        return bestBranchBlockList;
-    }
     private async Task<List<Block>> AddForkBranch(long previousHeight, Hash previousHash, int count = 5)
     {
         var forkBranchBlockList = new List<Block>();

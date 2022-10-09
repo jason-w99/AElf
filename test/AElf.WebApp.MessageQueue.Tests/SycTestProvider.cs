@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AElf.WebApp.MessageQueue;
@@ -30,7 +31,7 @@ public class SycTestProvider : ISyncBlockStateProvider
         _messageQueueOptions = messageQueueEnableOptions.Value;
         _distributedCache = distributedCache;
         SyncSemaphore = new SemaphoreSlim(1, 1);
-        _blockSynState = $"{BlockSyncState}-{_messageQueueOptions.ClientName}";
+        _blockSynState = $"{BlockSyncState}-{_messageQueueOptions.ChainId}";
     }
 
     public async Task InitializeAsync()
@@ -97,7 +98,7 @@ public class SycTestProvider : ISyncBlockStateProvider
         
         using (await SyncSemaphore.LockAsync())
         {
-            if (_blockSyncStateInformation.SentBlockHashs.IsNullOrEmpty() && CollectionExtensions.IsNullOrEmpty(_blockSyncStateInformation.FirstSendBlockHash))
+            if (_blockSyncStateInformation.SentBlockHashs.IsNullOrEmpty() && String.IsNullOrEmpty(_blockSyncStateInformation.FirstSendBlockHash))
             {
                 _blockSyncStateInformation.FirstSendBlockHash = blockHash;
             }
@@ -107,6 +108,15 @@ public class SycTestProvider : ISyncBlockStateProvider
         }
 
       
+    }
+
+    public async Task AddBlocksHashAsync(Dictionary<string, string> blocksHash)
+    {
+        using (await SyncSemaphore.LockAsync())
+        {
+            _blockSyncStateInformation.SentBlockHashs= _blockSyncStateInformation.SentBlockHashs.Union(blocksHash).ToDictionary(k => k.Key, v => v.Value);
+            await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
+        }
     }
 
     public async Task DeleteBlockHashAsync(string blockHash)
