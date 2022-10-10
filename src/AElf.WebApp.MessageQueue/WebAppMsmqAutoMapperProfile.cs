@@ -17,10 +17,10 @@ public class WebAppMsmqAutoMapperProfile : Profile
         * into multiple profile classes for a better organization. */
         CreateMap<LogEvent, LogEventEto>()
             .ForMember(destination => destination.ContractAddress,
-                opt => opt.MapFrom(source => source.Address.ToBase58()))
-            .ForMember(destination => destination.Index,
-                opt => opt.MapFrom(source => source.Indexed.Select(i => i.ToBase64()).ToArray()));
-            /*.ForMember(destination => destination.NonIndexed,
+                opt => opt.MapFrom(source => source.Address.ToBase58()));
+           /*.ForMember(destination => destination.Index,
+                opt => opt.MapFrom(source => source.Indexed.Select(i => i.ToBase64()).ToArray()))
+            .ForMember(destination => destination.NonIndexed,
                 opt => opt.MapFrom(source => source.NonIndexed.ToBase64()));*/
 
         CreateMap<TransactionResult, TransactionMessageEto>()
