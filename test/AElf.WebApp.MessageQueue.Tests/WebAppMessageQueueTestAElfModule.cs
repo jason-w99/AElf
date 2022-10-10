@@ -40,24 +40,11 @@ public class WebAppMessageQueueTestAElfModule : AbpModule
         //需要mock chain
         //services.AddSingleton(p => Mock.Of<>());
         services.AddDistributedMemoryCache();
-        //services.AddSingleton<ISyncBlockStateProvider, SycTestProvider>();
         services.AddSingleton<SendMessage>();
-        //services.AddSingleton<IBlockMessageService,BlockMessageService>();
     }
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
     {
         var kernelTestHelper = context.ServiceProvider.GetService<KernelTestHelper>();
         var chain = AsyncHelper.RunSync(() => kernelTestHelper.MockChainAsync());
-
-        
-        var previousBlockHeader = kernelTestHelper.BestBranchBlockList.Last().Header;
-        //var chain = AsyncHelper.RunSync(() => MockChainAsync(kernelTestHelper));
-        var transactions =
-            kernelTestHelper.GenerateTransactions(3, previousBlockHeader.Height, previousBlockHeader.PreviousBlockHash);
-        var transactionResult =
-            kernelTestHelper.GenerateTransactionResult(transactions[0], TransactionResultStatus.Mined);
-
     }
-
-
 }
