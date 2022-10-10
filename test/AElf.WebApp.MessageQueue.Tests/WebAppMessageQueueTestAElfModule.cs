@@ -37,7 +37,7 @@ public class WebAppMessageQueueTestAElfModule : AbpModule
     {
         base.ConfigureServices(context);
         var services = context.Services;
-        //需要mock chain
+        //need mock chain
         //services.AddSingleton(p => Mock.Of<>());
         services.AddDistributedMemoryCache();
     }

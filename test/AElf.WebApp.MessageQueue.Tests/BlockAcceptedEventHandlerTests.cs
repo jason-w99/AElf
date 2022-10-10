@@ -218,7 +218,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
         Block block = _kernelTestHelper.GenerateBlock(15,presHash);
         blockExecutedSet.Block = block;
-        //发送一个同步的,分叉后另一条链上的某个高度的区块，判断是否将这条分叉的连上的 其他区块也发送出来
+        //Send a synchronized block at a certain height on the other chain after the fork, and determine whether to send other blocks connected to the fork
         await _blockMessageService.SendMessageAsync(blockExecutedSet);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         bool isTrue = true;
