@@ -3,36 +3,35 @@ using System.Threading;
 using System.Threading.Tasks;
 using AElf.WebApp.MessageQueue.Enum;
 using AElf.WebApp.MessageQueue.Provider;
-using AElf.WebApp.MessageQueue.Services;
-using Microsoft.Extensions.DependencyInjection;
-using Volo.Abp.BackgroundWorkers;
 
-namespace AElf.WebApp.MessageQueue;
+namespace AElf.WebApp.MessageQueue.Services;
 
-public class SendMessage
+public interface ISendMessageService
+{
+     Task DoWorkAsync(int blockCount, int parallelCount,CancellationToken cancellationToken);
+}
+
+public class SendMessageService :ISendMessageService
 {
     private readonly ISyncBlockStateProvider _syncBlockStateProvider;
     private readonly IBlockMessageService _blockMessageService;
     private readonly ISyncBlockLatestHeightProvider _latestHeightProvider;
-    protected CancellationToken CancellationToken { get; set; }
     
-    public SendMessage(ISyncBlockStateProvider syncBlockStateProvider,
+    public SendMessageService(ISyncBlockStateProvider syncBlockStateProvider,
         ISyncBlockLatestHeightProvider latestHeightProvider, IBlockMessageService blockMessageService) 
     {
         _syncBlockStateProvider = syncBlockStateProvider;
         _latestHeightProvider = latestHeightProvider;
         _blockMessageService = blockMessageService;
     }
-    
-    
-    public  async Task DoWorkAsync(int blockCount,int parallelCount)
+    public  async Task DoWorkAsync(int blockCount,int parallelCount,CancellationToken cancellationToken)
     {
         
         var currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
         var nextHeight = currentState.CurrentHeight;
 
         var remainCount = blockCount;
-        while (IsContinue(remainCount, currentState.State))
+        while (IsContinue(remainCount, currentState.State,cancellationToken))
         {
             var syncThreshold = GetSyncThresholdHeight();
             var startHeight = nextHeight;
@@ -43,7 +42,7 @@ public class SendMessage
                 break;
             }
             
-            var syncBlockHeight = await _blockMessageService.SendMessageAsync(startHeight, endHeight, CancellationToken);
+            var syncBlockHeight = await _blockMessageService.SendMessageAsync(startHeight, endHeight, cancellationToken);
             if (syncBlockHeight <= 0)
             {
                 await PreparedToSyncMessageAsync();
@@ -54,9 +53,9 @@ public class SendMessage
             nextHeight = syncBlockHeight;
             currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
         }
-        
+        currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
         var startCount = 0;
-        while (IsContinue(startCount++, currentState.State))
+        while (IsContinue(startCount++, currentState.State,cancellationToken))
         {
             var latestHeight = _latestHeightProvider.GetLatestHeight();
             if (nextHeight > latestHeight - 4)
@@ -65,7 +64,7 @@ public class SendMessage
                 break;
             }
             
-            if (await _blockMessageService.SendMessageAsync(nextHeight, CancellationToken))
+            if (await _blockMessageService.SendMessageAsync(nextHeight, cancellationToken))
             {
                 nextHeight++;
             }
@@ -79,9 +78,9 @@ public class SendMessage
         }
     } 
     
-    private bool IsContinue(long remainCount, SyncState state)
+    private bool IsContinue(long remainCount, SyncState state,CancellationToken cancellationToken)
     {
-        return remainCount > 0 && !CancellationToken.IsCancellationRequested &&
+        return remainCount > 0 && !cancellationToken.IsCancellationRequested &&
                state == SyncState.AsyncRunning;
     }
     

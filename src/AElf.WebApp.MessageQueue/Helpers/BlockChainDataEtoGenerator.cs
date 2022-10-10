@@ -9,7 +9,6 @@ using AElf.Kernel.Blockchain.Application;
 using AElf.Kernel.Blockchain.Domain;
 using AElf.Types;
 using Microsoft.Extensions.Logging;
-using Volo.Abp.Data;
 using Volo.Abp.ObjectMapping;
 
 

@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using AElf.WebApp.MessageQueue.Enum;
@@ -15,14 +14,14 @@ public class SendMessageWorker : AsyncPeriodicBackgroundWorkerBase
 {
     private readonly ISyncBlockStateProvider _syncBlockStateProvider;
     private readonly ISyncBlockLatestHeightProvider _latestHeightProvider;
-    private readonly SendMessage _sendMessage;
+    private readonly ISendMessageService _sendMessage;
     protected CancellationToken CancellationToken { get; set; }
     private int _blockCount;
     private int _parallelCount;
 
     public SendMessageWorker(ISyncBlockStateProvider syncBlockStateProvider, AbpAsyncTimer timer,
         IServiceScopeFactory serviceScopeFactory, IOptionsSnapshot<MessageQueueOptions> option,
-        ISyncBlockLatestHeightProvider latestHeightProvider, SendMessage sendMessage) : base(timer,
+        ISyncBlockLatestHeightProvider latestHeightProvider, ISendMessageService sendMessage) : base(timer,
         serviceScopeFactory)
     {
         _syncBlockStateProvider = syncBlockStateProvider;
@@ -66,7 +65,7 @@ public class SendMessageWorker : AsyncPeriodicBackgroundWorkerBase
 
     protected override async Task DoWorkAsync(PeriodicBackgroundWorkerContext workerContext)
     {
-        _sendMessage.DoWorkAsync( _blockCount,_parallelCount);
+        await _sendMessage.DoWorkAsync( _blockCount,_parallelCount,CancellationToken);
         
     }
     

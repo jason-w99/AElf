@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using AElf.Types;
-using Volo.Abp.Data;
 using Volo.Abp.EventBus;
 
 namespace AElf.WebApp.MessageQueue;

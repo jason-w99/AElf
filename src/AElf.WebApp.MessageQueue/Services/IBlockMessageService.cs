@@ -100,7 +100,6 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
             if (message.Height == heightIndex + 1 )
             {
                 blockEto.Add(message);
-                await _syncBlockStateProvider.UpdateStateAsync(message.Height);
                 heightIndex = message.Height;
                 continue;
             }
@@ -118,6 +117,7 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
             {
                 return -1;
             }
+            await _syncBlockStateProvider.UpdateStateAsync(blockEto.Last().Height);
         }
 
         return heightIndex;

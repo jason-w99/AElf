@@ -66,7 +66,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                     var preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.PreviousBlockId );
                     await PublishAsync(preBlock, Asynchronous);
                 }
-                blocksHash.Add(block.BlockHash,new PreBlock(){BlocHash = block.PreviousBlockHash,Height = block.Height-1});
+                blocksHash.Add(block.BlockHash,new PreBlock(){BlockHash = block.PreviousBlockHash,Height = block.Height-1});
             }
             await _syncBlockStateProvider.AddBlocksHashAsync(blocksHash);
             await _distributedEventBus.PublishAsync(blockChainDataEto);
@@ -127,25 +127,4 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         return !blockSyncState.SentBlockHashs.ContainsKey(blockEto.PreviousBlockHash) &&
                blockEto.PreviousBlockId != Hash.Empty && blockEto.Height> _messageQueueOptions.StartPublishMessageHeight;
     }
-
-    /*/// <summary>
-    ///    It also needs to check whether the previous block exists in the cache by hash of the previous block, and if it does not
-    ///    it keeps searching up (sending out every block that is not in the cache) until the query is reached
-    /// </summary>
-    /// <param name="blockEto"></param>
-    /// <exception cref="NotImplementedException"></exception>
-    private async Task CheckBlockContinuous(BlockEto blockEto)
-    {
-        var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        
-        if (!blockSyncState.SentBlockHashs.ContainsKey(blockEto.PreviousBlockHash) && blockEto.PreviousBlockId!=Hash.Empty 
-               // &&  blockEto.BlockHash!=blockSyncState.FirstSendBlockHash
-            )
-        {
-            //This block needs to be queried and sent
-            var blockMessageEto = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(blockEto.PreviousBlockId );
-            await PublishAsync(blockMessageEto, Asynchronous);
-        }
-        
-    }*/
 }

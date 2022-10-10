@@ -40,7 +40,6 @@ public class WebAppMessageQueueTestAElfModule : AbpModule
         //需要mock chain
         //services.AddSingleton(p => Mock.Of<>());
         services.AddDistributedMemoryCache();
-        services.AddSingleton<SendMessage>();
     }
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
     {

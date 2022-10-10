@@ -26,9 +26,9 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
 
     private readonly IBlockMessageService _blockMessageService;
     private readonly BlockAcceptedEventHandler _blockAcceptedEventHandler;
-    private readonly SendMessage _sendMessageServer;
+    private readonly ISendMessageService _sendMessageServer;
     private readonly NewIrreversibleBlockFoundEventHandler _newIrreversibleBlockFoundEventHandler;
-
+    protected CancellationToken CancellationToken = default;
 
     public BlockAcceptedEventHandlerTests()
     {
@@ -38,7 +38,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         _blockMessageService = GetRequiredService<IBlockMessageService>();
         _eventBus = GetRequiredService<ILocalEventBus>();
         _blockAcceptedEventHandler = GetRequiredService<BlockAcceptedEventHandler>();
-        _sendMessageServer = GetRequiredService<SendMessage>();
+        _sendMessageServer = GetRequiredService<ISendMessageService>();
         _newIrreversibleBlockFoundEventHandler = GetRequiredService<NewIrreversibleBlockFoundEventHandler>();
     }
 
@@ -49,17 +49,10 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     public async Task Test_01()
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(100);
-        BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
-        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
-        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
-        Block block = _kernelTestHelper.GenerateBlock(100,presHash);
-        blockExecutedSet.Block = block;
-        blockAcceptedEvent.BlockExecutedSet = blockExecutedSet;
         
-        await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
+        
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.Prepared);
-        //_syncBlockLatestHeightProvider.GetLatestHeight().ShouldBe(100);
     }
     
     [Fact]
@@ -113,7 +106,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(189);
         await _syncBlockStateProvider.UpdateStateAsync(199,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync(3,5);
+        await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
@@ -126,7 +119,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(189);
         await _syncBlockStateProvider.UpdateStateAsync(199,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync(3,5);
+        await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
@@ -139,7 +132,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(200);
         await _syncBlockStateProvider.UpdateStateAsync(99,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync(3,5);
+        await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
@@ -152,7 +145,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(_kernelTestHelper.BestBranchBlockList.Last().Height);
         await _syncBlockStateProvider.UpdateStateAsync(1,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync(3,5);
+        await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 

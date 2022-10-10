@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using AElf.ContractDeployer;
 using AElf.Contracts.Genesis;
 using AElf.Database;
 using AElf.Kernel;

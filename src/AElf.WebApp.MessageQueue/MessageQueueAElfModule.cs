@@ -4,6 +4,7 @@ using AElf.WebApp.Application;
 using AElf.WebApp.MessageQueue.Enum;
 using AElf.WebApp.MessageQueue.Helpers;
 using AElf.WebApp.MessageQueue.Provider;
+using AElf.WebApp.MessageQueue.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp;
@@ -31,6 +32,7 @@ public class MessageQueueAElfModule : AElfModule
         ConfigureCache();
         context.Services.AddTransient<IBlockMessageEtoGenerator, TransactionListEtoGenerator>();
         context.Services.AddTransient<IBlockChainDataEtoGenerator, BlockChainDataEtoGenerator>();
+        context.Services.AddTransient<ISendMessageService, SendMessageService>();
     }
 
     
