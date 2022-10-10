@@ -20,22 +20,6 @@ public class NewIrreversibleBlockFoundEventHandler  : ILocalEventHandler<NewIrre
     public async Task HandleEventAsync(NewIrreversibleBlockFoundEvent eventData)
     {
         //The cache data before lib needs to be deleted 
-        string preLibHash = eventData.BlockHash.ToHex();
-        //await CheckSendHash(preLibHash);
-        var provider=await _syncBlockStateProvider.GetCurrentStateAsync();
-        while (IsContinue(preLibHash,provider))
-        {
-            provider.SentBlockHashs.TryGetValue(preLibHash, out var preHash);
-            await _syncBlockStateProvider.DeleteBlockHashAsync(preLibHash);
-            preLibHash = preHash;
-            provider=await _syncBlockStateProvider.GetCurrentStateAsync();
-        }
-        
+        await _syncBlockStateProvider.DeleteBlockHashAsync(eventData.BlockHeight);
     }
-
-    private bool IsContinue( string preLibHash,SyncInformation provider )
-    {
-        return provider.SentBlockHashs.ContainsKey(preLibHash);
-    }
-
 }

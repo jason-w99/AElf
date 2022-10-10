@@ -31,7 +31,7 @@ namespace AElf.WebApp.Application.MessageQueue.Tests;
     typeof(KernelCoreTestAElfModule),
     typeof(AbpEventBusModule)
 )]
-public class TestModule : AbpModule
+public class WebAppMessageQueueTestAElfModule : AbpModule
 {
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
@@ -40,8 +40,8 @@ public class TestModule : AbpModule
         //需要mock chain
         //services.AddSingleton(p => Mock.Of<>());
         services.AddDistributedMemoryCache();
-        services.AddSingleton<ISyncBlockStateProvider, SycTestProvider>();
-        services.AddSingleton<SendMessageServer>();
+        //services.AddSingleton<ISyncBlockStateProvider, SycTestProvider>();
+        services.AddSingleton<SendMessage>();
         //services.AddSingleton<IBlockMessageService,BlockMessageService>();
     }
     public override void OnApplicationInitialization(ApplicationInitializationContext context)

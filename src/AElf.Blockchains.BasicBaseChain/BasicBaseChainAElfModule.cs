@@ -58,8 +58,7 @@ namespace AElf.Blockchains.BasicBaseChain;
     //plugin
     typeof(ExecutionPluginForMethodFeeModule),
     typeof(ExecutionPluginForResourceFeeModule),
-    typeof(ExecutionPluginForCallThresholdModule),
-    typeof(MessageQueueAElfModule)
+    typeof(ExecutionPluginForCallThresholdModule)
 )]
 public class BasicBaseChainAElfModule : AElfModule
 {

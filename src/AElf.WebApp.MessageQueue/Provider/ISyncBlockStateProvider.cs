@@ -18,9 +18,9 @@ public interface ISyncBlockStateProvider
 
     Task UpdateStateAsync(long? height, SyncState? state = null, SyncState? expectationState = null);
 
-    Task AddBlockHashAsync(string blockHash, string preBlockHash);
-    Task AddBlocksHashAsync(Dictionary<string, string> blocksHash);
-    Task DeleteBlockHashAsync(string blockHash);
+    Task AddBlockHashAsync(string blockHash, string preBlockHash,long preHeight);
+    Task AddBlocksHashAsync(Dictionary<string, PreBlock> blocksHash);
+    Task DeleteBlockHashAsync(long libHeight);
     
     
 }
@@ -65,7 +65,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         }
 
         _blockSyncStateInformation.State = _messageQueueOptions.Enable ? SyncState.Prepared : SyncState.Stopped;
-        _blockSyncStateInformation.SentBlockHashs = new Dictionary<string, string>();
+        _blockSyncStateInformation.SentBlockHashs = new Dictionary<string, PreBlock>();
         
         _logger.LogInformation(
             $"BlockSyncState initialized, State: {_blockSyncStateInformation.State}  CurrentHeight: {_blockSyncStateInformation.CurrentHeight}");
@@ -105,7 +105,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         _logger.LogInformation(
             $"BlockSyncState updated, State: {dataToUpdate.State}  CurrentHeight: {dataToUpdate.CurrentHeight}");
     }
-    public async Task AddBlockHashAsync(string blockHash,string preBlockHash)
+    public async Task AddBlockHashAsync(string blockHash,string preBlockHash,long preHeight)
     {
         
         using (await SyncSemaphore.LockAsync())
@@ -114,15 +114,16 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             {
                 _blockSyncStateInformation.FirstSendBlockHash = blockHash;
             }
-            _blockSyncStateInformation.SentBlockHashs.Add(blockHash,preBlockHash);
+            
+            _blockSyncStateInformation.SentBlockHashs.Add(blockHash,new PreBlock(){BlocHash = preBlockHash,Height = preHeight});
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
 
         _logger.LogInformation(
             $"BlockSyncState AddBlockHashAsync, blockHash: {blockHash}  preBlockHash: {preBlockHash}");
     }
-
-    public async Task AddBlocksHashAsync(Dictionary<string, string> blocksHash)
+    
+    public async Task AddBlocksHashAsync(Dictionary<string, PreBlock> blocksHash)
     {
         using (await SyncSemaphore.LockAsync())
         {
@@ -133,16 +134,29 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         _logger.LogInformation(
             $"BlockSyncState AddBlocksHashAsync ");
     }
-    public async Task DeleteBlockHashAsync(string blockHash)
+    public async Task DeleteBlockHashAsync(long libHeight)
     {
         using (await SyncSemaphore.LockAsync())
         {
-            _blockSyncStateInformation.SentBlockHashs.Remove(blockHash);
+            List<string> keys = new List<string>();
+            foreach (var sendBolck in _blockSyncStateInformation.SentBlockHashs)
+            {
+                if (sendBolck.Value.Height<libHeight)
+                {
+                    keys.Add(sendBolck.Key);
+                }
+                
+            }
+
+            foreach (var key in keys)
+            {
+                _blockSyncStateInformation.SentBlockHashs.Remove(key);
+            }
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
 
         _logger.LogInformation(
-            $"BlockSyncState delete SentBlockHashs before lib, blockHash: {blockHash} ");
+            $"BlockSyncState delete SentBlockHashs before lib, libHeight: {libHeight} ");
     }
 }
 
@@ -153,5 +167,12 @@ public class SyncInformation
     
     public string  FirstSendBlockHash { get; set; }
 
-    public Dictionary<string, string> SentBlockHashs { set; get; }
+    public Dictionary<string, PreBlock> SentBlockHashs { set; get; }
+}
+
+public class PreBlock
+{
+    public string BlocHash { set; get; }
+    public long Height { set; get; }
+
 }

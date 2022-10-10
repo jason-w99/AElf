@@ -55,7 +55,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         _logger.LogInformation($"PublishList Start publish block: {blockChainDataEto.Blocks.First().Height} ~{blockChainDataEto.Blocks.Last().Height }.");
         try
         {
-            Dictionary<string, string> blocksHash = new Dictionary<string, string>();
+            Dictionary<string, PreBlock> blocksHash = new Dictionary<string, PreBlock>();
             foreach (var block in blockChainDataEto.Blocks)
             {
                 var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
@@ -64,7 +64,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                     var preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.PreviousBlockId );
                     await PublishAsync(preBlock, Asynchronous);
                 }
-                blocksHash.Add(block.BlockHash,block.PreviousBlockHash);
+                blocksHash.Add(block.BlockHash,new PreBlock(){BlocHash = block.PreviousBlockHash,Height = block.Height-1});
             }
             await _syncBlockStateProvider.AddBlocksHashAsync(blocksHash);
             await _distributedEventBus.PublishAsync(blockChainDataEto);
@@ -107,7 +107,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
                 //Added logic
                 //The hash needs to be stored in the cache after each transmission ，
-                await _syncBlockStateProvider.AddBlockHashAsync(message.BlockHash,message.PreviousBlockHash);
+                await _syncBlockStateProvider.AddBlockHashAsync(message.BlockHash,message.PreviousBlockHash,message.Height-1);
                 message = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(message.PreviousBlockId );
                 blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
             }

@@ -32,18 +32,16 @@ public class MessageQueueRabbitMQAElfModule: AElfModule
 
      private void ConfigureRabbitMqEventBus(IConfiguration configuration)
      {
+         var rabbitMqConfig = configuration.GetSection("RabbitMQ");
          Configure<AbpRabbitMqEventBusOptions>(options =>
          {
-             var rabbitMqConfig = configuration.GetSection("RabbitMQ");
              options.ClientName = rabbitMqConfig.GetSection("ClientName").Value;
              options.ExchangeName = rabbitMqConfig.GetSection("ExchangeName").Value;
          });
     
          Configure<AbpRabbitMqOptions>(options =>
          {
-            var rabbitMqConfig = configuration.GetSection("RabbitMQ");
               var hostName = rabbitMqConfig.GetSection("HostName").Value;
-         
               options.Connections.Default.HostName = hostName;
               options.Connections.Default.Port = int.Parse(rabbitMqConfig.GetSection("Port").Value);
               options.Connections.Default.UserName = rabbitMqConfig.GetSection("UserName").Value;

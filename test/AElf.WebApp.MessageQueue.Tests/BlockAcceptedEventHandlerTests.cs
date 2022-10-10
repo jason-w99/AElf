@@ -17,7 +17,7 @@ using NewIrreversibleBlockFoundEventHandler = AElf.WebApp.MessageQueue.NewIrreve
 
 namespace AElf.WebApp.Application.MessageQueue.Tests;
 
-public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
+public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQueueTestAElfModule>
 {
     private readonly ILocalEventBus _eventBus;
     private readonly ISyncBlockStateProvider _syncBlockStateProvider;
@@ -25,9 +25,8 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
     private readonly KernelTestHelper _kernelTestHelper;
 
     private readonly IBlockMessageService _blockMessageService;
-    private readonly ISendMessageByDesignateHeightTaskManager _sendMessageByDesignateHeightTaskManager;
     private readonly BlockAcceptedEventHandler _blockAcceptedEventHandler;
-    private readonly SendMessageServer _sendMessageServer;
+    private readonly SendMessage _sendMessageServer;
     private readonly NewIrreversibleBlockFoundEventHandler _newIrreversibleBlockFoundEventHandler;
 
 
@@ -37,10 +36,9 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         _syncBlockStateProvider = GetRequiredService<ISyncBlockStateProvider>();
         _syncBlockLatestHeightProvider = GetRequiredService<ISyncBlockLatestHeightProvider>();
         _blockMessageService = GetRequiredService<IBlockMessageService>();
-        _sendMessageByDesignateHeightTaskManager = GetRequiredService<ISendMessageByDesignateHeightTaskManager>(); 
         _eventBus = GetRequiredService<ILocalEventBus>();
         _blockAcceptedEventHandler = GetRequiredService<BlockAcceptedEventHandler>();
-        _sendMessageServer = GetRequiredService<SendMessageServer>();
+        _sendMessageServer = GetRequiredService<SendMessage>();
         _newIrreversibleBlockFoundEventHandler = GetRequiredService<NewIrreversibleBlockFoundEventHandler>();
     }
 
@@ -115,7 +113,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(189);
         await _syncBlockStateProvider.UpdateStateAsync(199,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync();
+        await  _sendMessageServer.DoWorkAsync(3,5);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
@@ -128,7 +126,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(189);
         await _syncBlockStateProvider.UpdateStateAsync(199,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync();
+        await  _sendMessageServer.DoWorkAsync(3,5);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
@@ -141,7 +139,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(200);
         await _syncBlockStateProvider.UpdateStateAsync(99,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync();
+        await  _sendMessageServer.DoWorkAsync(3,5);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
@@ -154,7 +152,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(_kernelTestHelper.BestBranchBlockList.Last().Height);
         await _syncBlockStateProvider.UpdateStateAsync(1,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync();
+        await  _sendMessageServer.DoWorkAsync(3,5);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
@@ -277,14 +275,14 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<TestModule>
         blockExecutedSet.Block = block;
         await _blockMessageService.SendMessageAsync(blockExecutedSet);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.SentBlockHashs.Count.ShouldBeGreaterThan(10);
+        blockSyncState.SentBlockHashs.Count.ShouldBeGreaterThan(9);
 
         NewIrreversibleBlockFoundEvent _event = new NewIrreversibleBlockFoundEvent();
-        _event.PreviousIrreversibleBlockHash = presHash;
+        _event.BlockHeight = 5;
         _newIrreversibleBlockFoundEventHandler.HandleEventAsync(_event);
         
         blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.SentBlockHashs.Count.ShouldBe(1);
+        blockSyncState.SentBlockHashs.Count.ShouldBe(6);
 
     }
 }
