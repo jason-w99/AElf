@@ -110,11 +110,6 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         
         using (await SyncSemaphore.LockAsync())
         {
-            if (_blockSyncStateInformation.SentBlockHashs.IsNullOrEmpty() && string.IsNullOrEmpty(_blockSyncStateInformation.FirstSendBlockHash))
-            {
-                _blockSyncStateInformation.FirstSendBlockHash = blockHash;
-            }
-            
             _blockSyncStateInformation.SentBlockHashs.Add(blockHash,new PreBlock(){BlocHash = preBlockHash,Height = preHeight});
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
@@ -164,9 +159,6 @@ public class SyncInformation
 {
     public long CurrentHeight { get; set; }
     public SyncState State { get; set; }
-    
-    public string  FirstSendBlockHash { get; set; }
-
     public Dictionary<string, PreBlock> SentBlockHashs { set; get; }
 }
 

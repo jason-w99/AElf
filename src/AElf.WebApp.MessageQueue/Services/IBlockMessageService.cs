@@ -65,8 +65,8 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
             queryTasks.Add(QueryBlockMessageAsync(i, blockMessageList, cts));
         }
 
-        //await queryTasks.WhenAll();
-        if (blockMessageList==null || !blockMessageList.Any())
+        await queryTasks.WhenAll();
+        if (!blockMessageList.Any())
         {
             _logger.LogError($"Failed to query message from: {from + 1} to: {to + 1}, 0 messages found");
             return -1;
@@ -97,7 +97,6 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
                 break;
             }
 
-            //if (message.Height == heightIndex + 1 && await _messagePublishService.PublishAsync(message))
             if (message.Height == heightIndex + 1 )
             {
                 blockEto.Add(message);

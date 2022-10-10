@@ -8,6 +8,7 @@ using AElf.Types;
 using AElf.WebApp.MessageQueue.Helpers;
 using AElf.WebApp.MessageQueue.Provider;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.EventBus.Distributed;
 
@@ -29,14 +30,15 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
     private readonly ISyncBlockStateProvider _syncBlockStateProvider;
     private const string Asynchronous = "Asynchronous";
     private const string Synchronous = "Synchronous";
-
+    private readonly MessageQueueOptions _messageQueueOptions;
     public MessagePublishService(IDistributedEventBus distributedEventBus,
-        IBlockChainDataEtoGenerator blockChainDataEtoGenerator, ILogger<MessagePublishService> logger, ISyncBlockStateProvider syncBlockStateProvider)
+        IBlockChainDataEtoGenerator blockChainDataEtoGenerator, ILogger<MessagePublishService> logger, ISyncBlockStateProvider syncBlockStateProvider,  IOptionsSnapshot<MessageQueueOptions> messageQueueEnableOptions)
     {
         _distributedEventBus = distributedEventBus;
         _blockChainDataEtoGenerator = blockChainDataEtoGenerator;
         _logger = logger;
         _syncBlockStateProvider = syncBlockStateProvider;
+        _messageQueueOptions = messageQueueEnableOptions.Value;
     }
 
     public async Task<bool> PublishAsync(long height, CancellationToken cts)
@@ -122,9 +124,8 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
 
     private bool IsContinue(BlockEto blockEto,SyncInformation blockSyncState)
     {
-        
         return !blockSyncState.SentBlockHashs.ContainsKey(blockEto.PreviousBlockHash) &&
-               blockEto.PreviousBlockId != Hash.Empty;
+               blockEto.PreviousBlockId != Hash.Empty && blockEto.Height> _messageQueueOptions.StartPublishMessageHeight;
     }
 
     /*/// <summary>
