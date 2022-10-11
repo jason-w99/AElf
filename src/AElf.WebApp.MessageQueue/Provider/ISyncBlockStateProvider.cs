@@ -65,7 +65,11 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         }
 
         _blockSyncStateInformation.State = _messageQueueOptions.Enable ? SyncState.Prepared : SyncState.Stopped;
-        _blockSyncStateInformation.SentBlockHashs = new Dictionary<string, PreBlock>();
+        if (_blockSyncStateInformation.SentBlockHashs==null || _blockSyncStateInformation.SentBlockHashs.Count==0)
+        {
+            _blockSyncStateInformation.SentBlockHashs = new Dictionary<string, PreBlock>();
+        }
+        
         
         _logger.LogInformation(
             $"BlockSyncState initialized, State: {_blockSyncStateInformation.State}  CurrentHeight: {_blockSyncStateInformation.CurrentHeight}");
@@ -141,6 +145,10 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
     {
         using (await SyncSemaphore.LockAsync())
         {
+            if (_blockSyncStateInformation.CurrentHeight< libHeight)
+            {
+                return;
+            }
             List<string> keys = new List<string>();
             foreach (var sendBolck in _blockSyncStateInformation.SentBlockHashs)
             {
