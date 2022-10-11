@@ -144,7 +144,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     public async Task Test_08()
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(_kernelTestHelper.BestBranchBlockList.Last().Height);
-        await _syncBlockStateProvider.UpdateStateAsync(1,SyncState.AsyncRunning);
+        await _syncBlockStateProvider.UpdateStateAsync(null,SyncState.AsyncRunning);
         await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);

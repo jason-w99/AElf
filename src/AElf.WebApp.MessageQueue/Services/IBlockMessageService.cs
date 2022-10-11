@@ -121,7 +121,7 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         }
 
         return heightIndex;
-    }
+    } 
     
     private async Task QueryBlockMessageAsync(long height, ConcurrentBag<BlockEto> blockMessageList,
         CancellationToken cts)

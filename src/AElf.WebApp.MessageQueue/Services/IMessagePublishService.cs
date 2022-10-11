@@ -61,7 +61,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             foreach (var block in blockChainDataEto.Blocks)
             {
                 var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-                if (!blockSyncState.SentBlockHashs.ContainsKey(block.PreviousBlockHash) )
+                if (!blockSyncState.SentBlockHashs.ContainsKey(block.PreviousBlockHash) && block.Height-1 >= _messageQueueOptions.StartPublishMessageHeight && !blocksHash.ContainsKey(block.PreviousBlockHash))
                 {
                     var preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.PreviousBlockId );
                     await PublishAsync(preBlock, Asynchronous);
@@ -95,6 +95,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         _logger.LogInformation($"{runningPattern} Start publish block: {message.Height}.");
         try
         {
+            
             var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
             while (IsContinue(message,blockSyncState))
             {
@@ -124,7 +125,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
 
     private bool IsContinue(BlockEto blockEto,SyncInformation blockSyncState)
     {
-        return !blockSyncState.SentBlockHashs.ContainsKey(blockEto.PreviousBlockHash) &&
-               blockEto.PreviousBlockId != Hash.Empty && blockEto.Height> _messageQueueOptions.StartPublishMessageHeight;
+        return !blockSyncState.SentBlockHashs.ContainsKey(blockEto.BlockHash) &&
+               blockEto.BlockHash != Hash.Empty.ToString() && blockEto.Height>= _messageQueueOptions.StartPublishMessageHeight;
     }
 }

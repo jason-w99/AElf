@@ -122,8 +122,16 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
     {
         using (await SyncSemaphore.LockAsync())
         {
-            _blockSyncStateInformation.SentBlockHashs= _blockSyncStateInformation.SentBlockHashs.Union(blocksHash).ToDictionary(k => k.Key, v => v.Value);
-          
+            foreach (KeyValuePair<string, PreBlock> kvp in blocksHash)
+            {
+                if (!_blockSyncStateInformation.SentBlockHashs.ContainsKey(kvp.Key))
+                {
+                    _blockSyncStateInformation.SentBlockHashs.Add(kvp.Key,kvp.Value);
+                }
+            }
+            /*Dictionary<string, PreBlock> temp = new Dictionary<string, PreBlock>();
+            temp= _blockSyncStateInformation.SentBlockHashs.Concat(blocksHash).ToDictionary(k => k.Key, v => v.Value);
+            _blockSyncStateInformation.SentBlockHashs = temp;*/
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
         _logger.LogInformation(
