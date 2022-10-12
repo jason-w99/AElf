@@ -43,7 +43,7 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         var isSuccess = await _messagePublishService.PublishAsync(height, cts);
         if (!isSuccess)
             return false;
-        await _syncBlockStateProvider.UpdateStateAsync(height + 1);
+        await _syncBlockStateProvider.UpdateStateAsync(height);
         return true;
     }
 
@@ -68,7 +68,7 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         await queryTasks.WhenAll();
         if (!blockMessageList.Any())
         {
-            _logger.LogError($"Failed to query message from: {from + 1} to: {to + 1}, 0 messages found");
+            _logger.LogError($"Failed to query message from: {from } to: {to}, 0 messages found");
             return -1;
         }
 
@@ -83,13 +83,13 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         {
             if (heightIndex == 0)
             {
-                if (message.Height != from + 1)
+                if (message.Height != from )
                 {
-                    _logger.LogError($"Failed to query message from: {from + 1} to: {to + 1}");
+                    _logger.LogError($"Failed to query message from: {from} to: {to}");
                     return -1;
                 }
 
-                heightIndex = message.Height - 1;
+                heightIndex = message.Height;
             }
 
             if (cts.IsCancellationRequested)
@@ -97,10 +97,10 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
                 break;
             }
 
-            if (message.Height == heightIndex + 1 )
+            if (message.Height == heightIndex )
             {
                 blockEto.Add(message);
-                heightIndex = message.Height;
+                heightIndex = message.Height+1;
                 continue;
             }
             
@@ -110,9 +110,8 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
 
         if (heightIndex!=-1)
         {
-            blockChainDataEto.ChainId = blockEto.First().ChainId;
-            blockChainDataEto.Blocks = blockEto;
-            var isSuccess=await _messagePublishService.PublishListAsync(blockChainDataEto);
+           
+            var isSuccess=await _messagePublishService.PublishListAsync(blockEto);
             if (!isSuccess)
             {
                 return -1;

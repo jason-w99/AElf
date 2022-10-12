@@ -18,7 +18,7 @@ public interface IMessagePublishService
 {
     Task<bool> PublishAsync(long height, CancellationToken cts);
     Task<bool> PublishAsync(BlockEto blockEto);
-    Task<bool> PublishListAsync(BlockChainDataEto blockChainDataEto);
+    Task<bool> PublishListAsync(List<BlockEto> Blocks);
     Task<bool> PublishAsync(BlockExecutedSet blockExecutedSet);
 }
 
@@ -52,24 +52,119 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         return false;
     }
 
-    public async Task<bool> PublishListAsync(BlockChainDataEto blockChainDataEto)
+    public async Task<bool> PublishListAsync(List<BlockEto> blocks)
     {
-        _logger.LogInformation($"PublishList Start publish block: {blockChainDataEto.Blocks.First().Height} ~{blockChainDataEto.Blocks.Last().Height }.");
+        _logger.LogInformation($"PublishList Start publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
         try
         {
+            var block = blocks.Last(); 
             Dictionary<string, PreBlock> blocksHash = new Dictionary<string, PreBlock>();
-            foreach (var block in blockChainDataEto.Blocks)
+            List<BlockEto> mainBlocks = new List<BlockEto>();
+            List<BlockEto> forkBlocks = new List<BlockEto>();
+            List<BlockEto> saveForkBlocks = new List<BlockEto>();
+            
+            var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+            if (blockSyncState.SentBlockHashs.ContainsKey(block.BlockHash) 
+                || block.Height< _messageQueueOptions.StartPublishMessageHeight)
             {
-                var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-                if (!blockSyncState.SentBlockHashs.ContainsKey(block.PreviousBlockHash) && block.Height-1 >= _messageQueueOptions.StartPublishMessageHeight && !blocksHash.ContainsKey(block.PreviousBlockHash))
-                {
-                    var preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.PreviousBlockId );
-                    await PublishAsync(preBlock, Asynchronous);
-                }
-                blocksHash.Add(block.BlockHash,new PreBlock(){BlockHash = block.PreviousBlockHash,Height = block.Height-1});
+                return true;
             }
+            mainBlocks.Add(block);
+            blocksHash.Add(block.BlockHash,new PreBlock(){BlockHash = block.PreviousBlockHash,Height = block.Height-1});
+
+            var preHash = block.PreviousBlockHash;
+            var preBlockId = block.PreviousBlockId;
+            int i = 1;
+            //check datalist
+            while (true)
+            {
+                if (mainBlocks.Count>=blocks.Count)
+                {
+                    break;
+                }
+                if (blockSyncState.SentBlockHashs.ContainsKey(preHash) 
+                    || block.Height-i< _messageQueueOptions.StartPublishMessageHeight 
+                    || blocksHash.ContainsKey(preHash))
+                {
+                    break;
+                }
+                i += 1;
+                var preBlock = blocks.Find(c => c.BlockHash == preHash);
+                if (preBlock!=null)
+                {
+                    mainBlocks.Add(preBlock);
+                    blocksHash.Add(preBlock.BlockHash,new PreBlock(){BlockHash = preBlock.PreviousBlockHash,Height = preBlock.Height-1});
+                    preHash = preBlock.BlockHash;
+                    preBlockId = preBlock.PreviousBlockId;
+                    continue;
+                }
+                var dbBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(preBlockId);
+                
+                var dataBlock=blocks.Find(c => c.Height == preBlock.Height);
+                if (dataBlock!=null)
+                {
+                    forkBlocks.Add(dataBlock);
+                    blocksHash.Add(dataBlock.BlockHash,new PreBlock(){BlockHash = dataBlock.PreviousBlockHash,Height = dataBlock.Height-1});
+                }
+                mainBlocks.Add(dbBlock);
+                blocksHash.Add(dbBlock.BlockHash,new PreBlock(){BlockHash = dbBlock.PreviousBlockHash,Height = dbBlock.Height-1});
+                preHash = dbBlock.PreviousBlockHash;
+                preBlockId = dbBlock.PreviousBlockId;
+            }
+            
+            //check forklist
+            foreach (var forkBlock in forkBlocks)
+            {
+                if (blockSyncState.SentBlockHashs.ContainsKey(forkBlock.BlockHash) 
+                    || forkBlock.Height< _messageQueueOptions.StartPublishMessageHeight 
+                    || blocksHash.ContainsKey(forkBlock.BlockHash)
+                    || saveForkBlocks.Contains(forkBlock))
+                {
+                    continue;
+                }
+                saveForkBlocks.Add(forkBlock);
+                blocksHash.Add(forkBlock.BlockHash,new PreBlock(){BlockHash = forkBlock.PreviousBlockHash,Height = forkBlock.Height-1});
+                int j = 1;
+                var preForkHash = forkBlock.PreviousBlockHash;
+                var preForkBlockId = forkBlock.PreviousBlockId;
+                while (true)
+                {
+                    
+                    if (blockSyncState.SentBlockHashs.ContainsKey(preForkHash) 
+                        || forkBlock.Height-j< _messageQueueOptions.StartPublishMessageHeight 
+                        || blocksHash.ContainsKey(preForkHash))
+                    {
+                        break;
+                    }
+                    j += 1;
+                    var preBlock = blocks.Find(c => c.BlockHash == preHash);
+                    if (preBlock!=null)
+                    {
+                        saveForkBlocks.Add(preBlock);
+                        blocksHash.Add(preBlock.BlockHash,new PreBlock(){BlockHash = preBlock.PreviousBlockHash,Height = preBlock.Height-1});
+                        preForkHash = preBlock.BlockHash;
+                        preForkBlockId = preBlock.PreviousBlockId;
+                        continue;
+                    }
+                    var dbBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(preForkBlockId);
+                    
+                    saveForkBlocks.Add(dbBlock);
+                    blocksHash.Add(dbBlock.BlockHash,new PreBlock(){BlockHash = dbBlock.PreviousBlockHash,Height = dbBlock.Height-1});
+                    preForkHash = dbBlock.PreviousBlockHash;
+                    preForkBlockId = dbBlock.PreviousBlockId;
+                }
+            }
+            
             await _syncBlockStateProvider.AddBlocksHashAsync(blocksHash);
+            var blockChainDataEto = new BlockChainDataEto();
+            blockChainDataEto.ChainId = blocks.First().ChainId;
+            if (saveForkBlocks.Count>0)
+            {
+                mainBlocks.AddRange(saveForkBlocks);
+            }
+            blockChainDataEto.Blocks = mainBlocks;
             await _distributedEventBus.PublishAsync(blockChainDataEto);
+
             return true;
         }
         catch (Exception e)
@@ -97,7 +192,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         {
             
             var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-            while (IsContinue(message,blockSyncState))
+            /*while (IsContinue(message,blockSyncState))
             {
                 List<BlockEto> blockEtos = new List<BlockEto>();
                 blockEtos.Add(message);
@@ -111,6 +206,32 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 //Added logic
                 //The hash needs to be stored in the cache after each transmission ，
                 await _syncBlockStateProvider.AddBlockHashAsync(message.BlockHash,message.PreviousBlockHash,message.Height-1);
+                message = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(message.PreviousBlockId );
+                blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+            }*/
+            while (true)
+            {
+                if (!blockSyncState.SentBlockHashs.ContainsKey(message.BlockHash)
+                    && message.BlockHash != Hash.Empty.ToString()
+                    && message.Height>= _messageQueueOptions.StartPublishMessageHeight)
+                {
+                    break;
+                }
+                List<BlockEto> blockEtos = new List<BlockEto>();
+                blockEtos.Add(message);
+                var blockChainDataEto = new BlockChainDataEto()
+                {
+                    ChainId =message.ChainId,
+                    Blocks = blockEtos
+                };
+                await _distributedEventBus.PublishAsync(blockChainDataEto);
+                _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
+                //Added logic
+                //The hash needs to be stored in the cache after each transmission ，
+                await _syncBlockStateProvider.AddBlockHashAsync(message.BlockHash,message.PreviousBlockHash,message.Height-1);
+                
+                
+                
                 message = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(message.PreviousBlockId );
                 blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
             }

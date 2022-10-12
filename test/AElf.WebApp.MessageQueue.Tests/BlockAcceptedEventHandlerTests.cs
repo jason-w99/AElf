@@ -94,8 +94,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.AsyncRunning);
-        
-        
+
     }
     
     /// <summary>

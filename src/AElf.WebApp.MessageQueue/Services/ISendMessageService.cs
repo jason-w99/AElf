@@ -53,8 +53,7 @@ public class SendMessageService :ISendMessageService
             nextHeight = syncBlockHeight;
             currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
         }
-        currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        var startCount = 1;
+        /*var startCount = 0;
         while (IsContinue(startCount++, currentState.State,cancellationToken))
         {
             var latestHeight = _latestHeightProvider.GetLatestHeight();
@@ -75,7 +74,7 @@ public class SendMessageService :ISendMessageService
             }
 
             currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        }
+        }*/
     } 
     
     private bool IsContinue(long remainCount, SyncState state,CancellationToken cancellationToken)

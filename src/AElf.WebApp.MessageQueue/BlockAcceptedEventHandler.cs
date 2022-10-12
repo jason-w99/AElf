@@ -112,7 +112,7 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
         await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.SyncRunning);
         if (from <= to)
         {
-            _logger.LogInformation($"Catch up to current block, from: {from + 1} - to: {to + 1}");
+            _logger.LogInformation($"Catch up to current block, from: {from } - to: {to }");
         }
 
         for (var i = from; i <= to; i++)

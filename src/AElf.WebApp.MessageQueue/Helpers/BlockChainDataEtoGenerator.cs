@@ -171,8 +171,8 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
     {
         var chain = await _blockchainService.GetChainAsync();
         var hash = await _blockchainService.GetBlockHashByHeightAsync(chain, height, chain.LongestChainHash);
-        var blocks = await _blockchainService.GetBlocksInLongestChainBranchAsync(hash, 1);
-        return blocks.Any() ? blocks.First(): null;
+        //var blocks = await _blockchainService.GetBlocksInLongestChainBranchAsync(hash, 1);
+        return await _blockchainService.GetBlockByHashAsync(hash);
     }
 
    
