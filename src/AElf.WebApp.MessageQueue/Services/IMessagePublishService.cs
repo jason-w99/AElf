@@ -162,23 +162,34 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         _logger.LogInformation($"{runningPattern} Start publish block: {message.Height}.");
         try
         {
-            
             var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
             List<BlockEto> blockEtos = new List<BlockEto>();
+
+            if (blockSyncState.SentBlockHashs.ContainsKey(message.BlockHash)
+                || message.BlockHash == Hash.Empty.ToString()
+                || message.Height < _messageQueueOptions.StartPublishMessageHeight)
+            {
+                return true;
+            }
+            blockEtos.Add(message);
+            blockSyncState.SentBlockHashs.Add(message.BlockHash,new PreBlock(){BlockHash=message.PreviousBlockHash,Height = message.Height-1});
+            var preHash = message.PreviousBlockHash;
+            var preBlockId = message.PreviousBlockId;
+            int i = 1;
             while (true)
             {
-                if (blockSyncState.SentBlockHashs.ContainsKey(message.BlockHash)
-                    || message.BlockHash == Hash.Empty.ToString()
-                    || message.Height < _messageQueueOptions.StartPublishMessageHeight)
+                if (blockSyncState.SentBlockHashs.ContainsKey(preHash)
+                    || preHash == Hash.Empty.ToString()
+                    || message.Height-i < _messageQueueOptions.StartPublishMessageHeight)
                 {
                     break;
                 }
-                blockEtos.Add(message);
-                await _syncBlockStateProvider.AddBlockHashAsync(message.BlockHash,message.PreviousBlockHash,message.Height-1);
-                //Added logic
-                //The hash needs to be stored in the cache after each transmission ，
-                message = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(message.PreviousBlockId );
-                blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+                i += 1;
+                var preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(preBlockId );
+                blockEtos.Add(preBlock);
+                blockSyncState.SentBlockHashs.Add(preBlock.BlockHash,new PreBlock(){BlockHash=preBlock.PreviousBlockHash,Height = preBlock.Height-1});
+                preHash = preBlock.PreviousBlockHash;
+                preBlockId = preBlock.PreviousBlockId;
             }
 
             if (blockEtos.Count==0)
@@ -191,6 +202,8 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 Blocks = blockEtos.OrderBy(c=>c.Height).ToList()
             };
             await _distributedEventBus.PublishAsync(blockChainDataEto);
+            await _syncBlockStateProvider.UpdateBlocksHashAsync(blockSyncState.SentBlockHashs);
+
             _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
             return true;
         }
