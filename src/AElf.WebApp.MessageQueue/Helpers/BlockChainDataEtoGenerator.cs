@@ -53,7 +53,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
        
         if (block == null)
         {
-            _logger.LogWarning($"Failed to find block information, height: {block.Height + 1}");
+            _logger.LogWarning($"Failed to find block information, height: {block.Height}");
             return null;
         }
         var blockHash = block.Header.GetHash();

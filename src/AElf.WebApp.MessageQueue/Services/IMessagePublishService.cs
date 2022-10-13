@@ -84,7 +84,8 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 }
                 if (blockSyncState.SentBlockHashs.ContainsKey(preHash) 
                     || block.Height-i< _messageQueueOptions.StartPublishMessageHeight 
-                    || blocksHash.ContainsKey(preHash))
+                    || blocksHash.ContainsKey(preHash)
+                    )
                 {
                     break;
                 }
@@ -94,7 +95,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 {
                     mainBlocks.Add(preBlock);
                     blocksHash.Add(preBlock.BlockHash,new PreBlock(){BlockHash = preBlock.PreviousBlockHash,Height = preBlock.Height-1});
-                    preHash = preBlock.BlockHash;
+                    preHash = preBlock.PreviousBlockHash;
                     preBlockId = preBlock.PreviousBlockId;
                     continue;
                 }
