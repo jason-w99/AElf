@@ -75,9 +75,9 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         var queryHeightLog = new StringBuilder($"Query height from: {from} to: {to}: ");
         blockMessageList.ForAll(b => queryHeightLog.Append($"|{b.Height}|"));
         _logger.LogInformation(queryHeightLog.ToString());
+        
         var sortedMessageQuery = blockMessageList.OrderBy(b => b.Height);
-        long heightIndex = 0;
-        BlockChainDataEto blockChainDataEto = new BlockChainDataEto();
+        /*long heightIndex = 0;
         List<BlockEto> blockEto = new List<BlockEto>();
         foreach (var message in sortedMessageQuery)
         {
@@ -88,7 +88,6 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
                     _logger.LogError($"Failed to query message from: {from} to: {to}");
                     return -1;
                 }
-
                 heightIndex = message.Height;
             }
 
@@ -111,15 +110,15 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         if (heightIndex!=-1)
         {
            
-            var isSuccess=await _messagePublishService.PublishListAsync(blockEto);
+            var isSuccess=await _messagePublishService.PublishListAsync(sortedMessageQuery.ToList());
             if (!isSuccess)
             {
                 return -1;
             }
             await _syncBlockStateProvider.UpdateStateAsync(blockEto.Last().Height);
-        }
+        }*/
 
-        return heightIndex;
+        return await _messagePublishService.PublishListAsync(sortedMessageQuery.ToList());;
     } 
     
     private async Task QueryBlockMessageAsync(long height, ConcurrentBag<BlockEto> blockMessageList,

@@ -18,7 +18,7 @@ public interface IMessagePublishService
 {
     Task<bool> PublishAsync(long height, CancellationToken cts);
     Task<bool> PublishAsync(BlockEto blockEto);
-    Task<bool> PublishListAsync(List<BlockEto> Blocks);
+    Task<long> PublishListAsync(List<BlockEto> Blocks);
     Task<bool> PublishAsync(BlockExecutedSet blockExecutedSet);
 }
 
@@ -52,7 +52,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         return false;
     }
 
-    public async Task<bool> PublishListAsync(List<BlockEto> blocks)
+    public async Task<long> PublishListAsync(List<BlockEto> blocks)
     {
         _logger.LogInformation($"PublishList Start publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
         try
@@ -72,7 +72,8 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                     break;
                 }
                 mainBlocks.Add(block);
-                await _syncBlockStateProvider.AddBlockHashAsync(block.BlockHash,block.PreviousBlockHash, block.Height-1);
+                //await _syncBlockStateProvider.AddBlockHashAsync(block.BlockHash,block.PreviousBlockHash, block.Height-1);
+                blockSyncState.SentBlockHashs.Add(block.BlockHash,new PreBlock(){BlockHash = block.PreviousBlockHash,Height = block.Height-1});
                 var preBlock = blocks.Find(c => c.BlockHash == block.PreviousBlockHash);
                 if (preBlock != null)
                 {
@@ -101,7 +102,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                         break;
                     }
                     saveForkBlocks.Add(forkBlock);
-                    await _syncBlockStateProvider.AddBlockHashAsync(forkBlock.BlockHash,forkBlock.PreviousBlockHash, forkBlock.Height-1);
+                    blockSyncState.SentBlockHashs.Add(forkBlock.BlockHash,new PreBlock(){BlockHash = forkBlock.PreviousBlockHash,Height = forkBlock.Height-1});
                     var preBlock = blocks.Find(c => c.BlockHash == forkBlock.PreviousBlockHash);
                     if (preBlock != null)
                     {
@@ -114,11 +115,19 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 }
             }
             
+            long sendedHeight = blocks.Last().Height;
+            if (mainBlocks.Count==0)
+            {
+                await _syncBlockStateProvider.UpdateStateAsync(sendedHeight);
+                return sendedHeight+1;
+            }
+            mainBlocks = mainBlocks.OrderBy(c => c.Height).ToList();
+            sendedHeight=mainBlocks.Last().Height;
             var blockChainDataEto = new BlockChainDataEto();
             blockChainDataEto.ChainId = blocks.First().ChainId;
             if (saveForkBlocks.Count>0)
             {
-                saveForkBlocks.AddRange(mainBlocks);
+                saveForkBlocks.OrderBy(c=>c.Height).ToList().AddRange(mainBlocks);
                 blockChainDataEto.Blocks = saveForkBlocks;
             }
             else
@@ -126,13 +135,14 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 blockChainDataEto.Blocks = mainBlocks;
             }
             await _distributedEventBus.PublishAsync(blockChainDataEto);
-
-            return true;
+            await _syncBlockStateProvider.UpdateBlocksHashAsync(blockSyncState.SentBlockHashs);
+            await _syncBlockStateProvider.UpdateStateAsync(sendedHeight);
+            return sendedHeight +1;
         }
         catch (Exception e)
         {
             _logger.LogError($"Failed to publish events to mq service.\n{e.Message}");
-            return false;
+            return -1;
         }
     }
 

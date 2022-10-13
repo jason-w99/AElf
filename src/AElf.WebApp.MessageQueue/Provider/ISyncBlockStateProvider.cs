@@ -20,6 +20,7 @@ public interface ISyncBlockStateProvider
 
     Task AddBlockHashAsync(string blockHash, string preBlockHash,long preHeight);
     Task AddBlocksHashAsync(Dictionary<string, PreBlock> blocksHash);
+    Task UpdateBlocksHashAsync(Dictionary<string, PreBlock> blocksHash);
     Task DeleteBlockHashAsync(long libHeight);
     
     
@@ -136,6 +137,17 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             /*Dictionary<string, PreBlock> temp = new Dictionary<string, PreBlock>();
             temp= _blockSyncStateInformation.SentBlockHashs.Concat(blocksHash).ToDictionary(k => k.Key, v => v.Value);
             _blockSyncStateInformation.SentBlockHashs = temp;*/
+            await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
+        }
+        _logger.LogInformation(
+            $"BlockSyncState AddBlocksHashAsync ");
+    }
+    
+    public async Task UpdateBlocksHashAsync(Dictionary<string, PreBlock> blocksHash)
+    {
+        using (await SyncSemaphore.LockAsync())
+        {
+            _blockSyncStateInformation.SentBlockHashs = blocksHash;
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
         _logger.LogInformation(
