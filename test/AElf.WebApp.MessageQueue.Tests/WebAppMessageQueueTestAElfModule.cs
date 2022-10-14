@@ -7,6 +7,7 @@ using AElf.Kernel.Blockchain.Application;
 using AElf.OS;
 using AElf.OS.Node.Application;
 using AElf.Types;
+using AElf.WebApp.Application.MessageQueue.Tests.Helps;
 using AElf.WebApp.MessageQueue;
 using AElf.WebApp.MessageQueue.Helpers;
 using AElf.WebApp.MessageQueue.Provider;
@@ -39,11 +40,14 @@ public class WebAppMessageQueueTestAElfModule : AbpModule
         var services = context.Services;
         //need mock chain
         //services.AddSingleton(p => Mock.Of<>());
+        services.AddSingleton<MockChainHelper>();
         services.AddDistributedMemoryCache();
     }
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
     {
-        var kernelTestHelper = context.ServiceProvider.GetService<KernelTestHelper>();
-        var chain = AsyncHelper.RunSync(() => kernelTestHelper.MockChainAsync());
+        /*var kernelTestHelper = context.ServiceProvider.GetService<KernelTestHelper>();
+        var chain = AsyncHelper.RunSync(() => kernelTestHelper.MockChainAsync());*/
+        var mockChainHelper = context.ServiceProvider.GetService<MockChainHelper>();
+        var otherChain = AsyncHelper.RunSync(() => mockChainHelper.MockOtherChainAsync());
     }
 }

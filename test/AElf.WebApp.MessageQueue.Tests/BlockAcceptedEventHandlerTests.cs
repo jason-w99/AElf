@@ -7,8 +7,10 @@ using AElf.Kernel.Blockchain.Events;
 using AElf.TestBase;
 using AElf.WebApp.MessageQueue;
 using AElf.WebApp.MessageQueue.Enum;
+using AElf.WebApp.MessageQueue.Helpers;
 using AElf.WebApp.MessageQueue.Provider;
 using AElf.WebApp.MessageQueue.Services;
+using JetBrains.Annotations;
 using Shouldly;
 using Volo.Abp.EventBus.Local;
 using Volo.Abp.Uow;
@@ -28,6 +30,8 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     private readonly BlockAcceptedEventHandler _blockAcceptedEventHandler;
     private readonly ISendMessageService _sendMessageServer;
     private readonly NewIrreversibleBlockFoundEventHandler _newIrreversibleBlockFoundEventHandler;
+    private readonly IBlockChainDataEtoGenerator _blockChainDataEtoGenerator;
+
     protected CancellationToken CancellationToken = default;
 
     public BlockAcceptedEventHandlerTests()
@@ -40,13 +44,14 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         _blockAcceptedEventHandler = GetRequiredService<BlockAcceptedEventHandler>();
         _sendMessageServer = GetRequiredService<ISendMessageService>();
         _newIrreversibleBlockFoundEventHandler = GetRequiredService<NewIrreversibleBlockFoundEventHandler>();
+        _blockChainDataEtoGenerator = GetRequiredService<IBlockChainDataEtoGenerator>();
     }
 
     /// <summary>
-    /// Node push status: Initialization status Confirm - Prepared
+    /// 01  Node push status: Initialization status Confirm - Prepared
     /// </summary>
     [Fact]
-    public async Task Test_01()
+    public async Task Prepared_Test()
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(100);
         
@@ -54,9 +59,11 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.Prepared);
     }
-    
+    /// <summary>
+    /// 03  Prepare -> SyncRunning
+    /// </summary>
     [Fact]
-    public async Task Test_03()
+    public async Task PrepareToSyncRunning_Test()
     {
         // 2.Prepared
         BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
@@ -80,8 +87,12 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         
     }
 
+    /// <summary>
+    ///  04  Prepare -> AsyncRunning 
+    /// </summary>
     [Fact]
-    public async Task Test_04()
+    [CanBeNull]
+    public async Task PrepareToAsyncRunning_Test ()
     {
         BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
         BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
@@ -98,10 +109,10 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     }
     
     /// <summary>
-    /// Node push status: state switch -Asyncrunning -> SyncPrepared : Cache height >= incoming height -3
+    ///05 Node push status: state switch -Asyncrunning -> SyncPrepared : Cache height >= incoming height -3
     /// </summary>
     [Fact]
-    public async Task Test_05()
+    public async Task AsyncRunningToSyncPrepared_CacheHeight_Test()
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(189);
         await _syncBlockStateProvider.UpdateStateAsync(199,SyncState.AsyncRunning);
@@ -110,8 +121,8 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
     
-    /// <summary>
-    /// Node push status: state switch -Asyncrunning -> SyncPrepared : The height of the block to be sent is not equal to the height to be fetched
+    /*/// <summary>
+    /// 06 Node push status: state switch -Asyncrunning -> SyncPrepared : The height of the block to be sent is not equal to the height to be fetched
     /// </summary>
     [Fact]
     public async Task Test_06()
@@ -121,13 +132,13 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
-    } 
+    } */
     
     /// <summary>
-    /// Node push status: state switch -Asyncrunning -> SyncPrepared : Number of blocks to send is 0
+    /// 07 Node push status: state switch -Asyncrunning -> SyncPrepared : Number of blocks to send is 0
     /// </summary>
     [Fact]
-    public async Task Test_07()
+    public async Task AsyncRunningToSyncPrepared_SendNumberIs0_Test()
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(200);
         await _syncBlockStateProvider.UpdateStateAsync(99,SyncState.AsyncRunning);
@@ -136,7 +147,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
 
-    /// <summary>
+    /*/// <summary>
     /// Node push status: state switch -Asyncrunning -> SyncPrepared :Cache height > The incoming height  -4
     /// </summary>
     [Fact]
@@ -147,23 +158,26 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
-    } 
+    } */
 
-    /*/// <summary>
-    /// Node push status: state switch -Asyncrunning -> SyncPrepared :The received height is blockMessageEto == null
+    /// <summary>
+    /// 09 Node push status: state switch -Asyncrunning -> SyncPrepared :The received height is blockMessageEto == null
     /// </summary>
     [Fact]
-    public async Task Test_09()
+    public async Task AsyncRunningToSyncPrepared_ReceivedHeightIsNull_Test()
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(_kernelTestHelper.BestBranchBlockList.Last().Height);
         await _syncBlockStateProvider.UpdateStateAsync(1,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync();
+        await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
-    } */
+    } 
     
+    /// <summary>
+    /// 10 Node push status:SyncPrepared -> Prepare
+    /// </summary>
     [Fact]
-    public async Task Test_10()
+    public async Task SyncPreparedToPrepare_Test()
     {
         BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
         BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
@@ -192,8 +206,11 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         
     }
 
+    /// <summary>
+    /// 11 Node push status:SyncPrepared -> SyncRunning
+    /// </summary>
     [Fact]
-    public async Task Test_11()
+    public async Task SyncPreparedToSyncRunning_Test()
     {
         BlockAcceptedEvent blockAcceptedEvent = new BlockAcceptedEvent();
         BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
@@ -208,9 +225,11 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncRunning);
     }
-    
+    /// <summary>
+    /// 12 Async send message
+    /// </summary>
     [Fact]
-    public async Task Test_12()
+    public async Task AsyncSend_Test()
     {
         BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
         
@@ -234,10 +253,10 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
 
     
     /// <summary>
-    /// Function test: The synchronous message is sent successfully
+    /// 13 Function test: The synchronous message is sent successfully
     /// </summary>
     [Fact]
-    public async Task Test_13()
+    public async Task SyncSend_Test()
     {
         await _syncBlockStateProvider.UpdateStateAsync(100, SyncState.SyncRunning);
          _syncBlockLatestHeightProvider.SetLatestHeight(100);
@@ -256,10 +275,10 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     
     
     /// <summary>
-    /// Functional test: Delete the BlockHash cached below LIB after reaching LIB
+    /// 14 Functional test: Delete the BlockHash cached below LIB after reaching LIB
     /// </summary>
     [Fact]
-    public async Task Test_14()
+    public async Task DeleteUnderlibBlock_Test()
     {
         BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
         var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
@@ -275,6 +294,65 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         
         blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.SentBlockHashs.Count.ShouldBe(6);
+
+    }
+    
+    /// <summary>
+    /// 15 Batch Send blocks (PublishListAsync) - To receive a set of blocks without forks
+    /// </summary>
+    [Fact]
+    public async Task BatchSend_Normal_Test()
+    {
+        CancellationToken cancellationToken = default;
+        var syncBlockHeight = await _blockMessageService.SendMessageAsync(30, 39, cancellationToken);
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        syncBlockHeight.ShouldBe(40);
+
+    }
+    /// <summary>
+    /// 16 Batch Send blocks (PublishListAsync) - The received blocks have already been sent blocks
+    /// </summary>
+    [Fact]
+    public async Task BatchSend_AlreadySend_Test()
+    {
+        
+        CancellationToken cancellationToken = default;
+        var syncBlockHeight = await _blockMessageService.SendMessageAsync(41, 50, cancellationToken);
+        syncBlockHeight.ShouldBe(51);
+        //send again
+        syncBlockHeight = await _blockMessageService.SendMessageAsync(41, 50, cancellationToken);
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        
+        var block=await  _blockChainDataEtoGenerator.GetBlockMessageEtoByHeightAsync(50, cancellationToken);
+        var isTrue=blockSyncState.SentBlockHashs.ContainsKey(block.BlockHash);
+        isTrue.ShouldBe(true);
+    }
+    /// <summary>
+    /// 17 Batch Send blocks (PublishListAsync) - the block received has a continuous fork block  
+    /// </summary>
+    [Fact]
+    public async Task BatchSend_HasContinuousFork_Test()
+    {
+        
+
+    }
+    /// <summary>
+    /// 18 Batch Send blocks (PublishListAsync) - the block received has a discontinuous fork block   
+    /// </summary>
+    [Fact]
+    public async Task BatchSend_HasDiscontinuousFork_Test()
+    {
+        
+
+    }
+    
+    /// <summary>
+    /// 19 Batch Send blocks (PublishListAsync) -The received block has the fork block that has been sent
+    /// </summary>
+    [Fact]
+    public async Task BatchSend_AlreadySendFork_Test()
+    {
+        
 
     }
 }
