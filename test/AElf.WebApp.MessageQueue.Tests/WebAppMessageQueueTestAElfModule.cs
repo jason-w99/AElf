@@ -49,5 +49,6 @@ public class WebAppMessageQueueTestAElfModule : AbpModule
         var chain = AsyncHelper.RunSync(() => kernelTestHelper.MockChainAsync());*/
         var mockChainHelper = context.ServiceProvider.GetService<MockChainHelper>();
         var otherChain = AsyncHelper.RunSync(() => mockChainHelper.MockOtherChainAsync());
+        
     }
 }

@@ -29,6 +29,21 @@ public class MockChainHelper:KernelTestHelper
         _blockStateSetManger = blockStateSetManger;
     }
     
+    /// <summary>
+    ///     Mock a chain with a best branch, and some fork branches
+    /// </summary>
+    /// <returns>
+    ///     Mock Chain
+    ///     BestChainHeight: 11
+    ///     LongestChainHeight: 13
+    ///     LIB height: 5
+    ///     Height: 51 -> 52 -> 53 -> 54 -> 55 -> 56 -> 57 -> 58 -> 59 -> 60 -> 61 -> 62 -> 63 -> 64 -> 65 -> 66 -> 67 -> 68 -> 19
+    ///     Best Branch: a -> b -> c -> d -> e -> f -> g -> h -> i -> j  -> k
+    ///     Longest Branch:                                   (h)-> l -> m  -> n  -> o  ->  p ->  q ->  r ->  s ->  t ->  u ->
+    ///     v
+    ///     Fork Branch:                    (e)-> q -> r -> s -> t -> u
+    ///     Unlinked Branch:                                              v  -> w  -> x  -> y  -> z
+    /// </returns>
     public  async Task<Kernel.Chain> MockOtherChainAsync()
     {
         var chain = await CreateChain();
@@ -39,7 +54,7 @@ public class MockChainHelper:KernelTestHelper
         BestBranchBlockList.AddRange(await AddBestBranch());
 
         LongestBranchBlockList =
-            await AddForkBranch(BestBranchBlockList[7].Height, BestBranchBlockList[7].GetHash(), 200);
+            await AddForkBranch(BestBranchBlockList[57].Height, BestBranchBlockList[50].GetHash(), 11);
 
         foreach (var block in LongestBranchBlockList)
         {
@@ -49,7 +64,7 @@ public class MockChainHelper:KernelTestHelper
         }
 
         ForkBranchBlockList =
-            await AddForkBranch(BestBranchBlockList[4].Height, BestBranchBlockList[4].GetHash());
+            await AddForkBranch(BestBranchBlockList[52].Height, BestBranchBlockList[52].GetHash());
 
         NotLinkedBlockList = await AddForkBranch(9, HashHelper.ComputeFrom("UnlinkBlock"));
         // Set lib
@@ -80,7 +95,7 @@ public class MockChainHelper:KernelTestHelper
     {
         var bestBranchBlockList = new List<Block>();
 
-        for (var i = 0; i < 10; i++)
+        for (var i = 0; i < 60; i++)
         {
             var chain = await _blockchainService.GetChainAsync();
             var newBlock = await AttachBlock(chain.BestChainHeight, chain.BestChainHash);

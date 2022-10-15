@@ -38,13 +38,20 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
     public async Task<BlockEto> GetBlockMessageEtoByHeightAsync(long height, CancellationToken cts)
     {
         var block = await GetBlockByHeightAsync(height);
+        if (block==null)
+        {
+            return null;
+        }
         return await GetBlockMessageEtoByBlockAsync(block,cts.IsCancellationRequested);
     }
 
     public async Task<BlockEto> GetBlockMessageEtoByHashAsync(Hash blockId)
     {
         Block block = await _blockchainService.GetBlockByHashAsync(blockId);
-        
+        if (block==null)
+        {
+            return null;
+        }
         return await GetBlockMessageEtoByBlockAsync(block,false);
     }
 

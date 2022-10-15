@@ -80,7 +80,13 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                     block = preBlock;
                     continue;
                 }
+
+               
                 preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.PreviousBlockId);
+                if (preBlock==null)
+                {
+                    break;
+                }
                 var dataBlock=blocks.Find(c => c.Height == preBlock.Height);
                 if (dataBlock!=null)
                 {
@@ -127,7 +133,8 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             blockChainDataEto.ChainId = blocks.First().ChainId;
             if (saveForkBlocks.Count>0)
             {
-                saveForkBlocks.OrderBy(c=>c.Height).ToList().AddRange(mainBlocks);
+                saveForkBlocks = saveForkBlocks.OrderBy(c => c.Height).ToList();
+                saveForkBlocks.AddRange(mainBlocks);
                 blockChainDataEto.Blocks = saveForkBlocks;
             }
             else

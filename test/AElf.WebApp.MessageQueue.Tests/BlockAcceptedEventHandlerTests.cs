@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -5,6 +6,7 @@ using AElf.Kernel;
 using AElf.Kernel.Blockchain;
 using AElf.Kernel.Blockchain.Events;
 using AElf.TestBase;
+using AElf.WebApp.Application.MessageQueue.Tests.Helps;
 using AElf.WebApp.MessageQueue;
 using AElf.WebApp.MessageQueue.Enum;
 using AElf.WebApp.MessageQueue.Helpers;
@@ -24,19 +26,20 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     private readonly ILocalEventBus _eventBus;
     private readonly ISyncBlockStateProvider _syncBlockStateProvider;
     private readonly ISyncBlockLatestHeightProvider _syncBlockLatestHeightProvider;
-    private readonly KernelTestHelper _kernelTestHelper;
+    private readonly MockChainHelper _kernelTestHelper;
 
     private readonly IBlockMessageService _blockMessageService;
     private readonly BlockAcceptedEventHandler _blockAcceptedEventHandler;
     private readonly ISendMessageService _sendMessageServer;
     private readonly NewIrreversibleBlockFoundEventHandler _newIrreversibleBlockFoundEventHandler;
     private readonly IBlockChainDataEtoGenerator _blockChainDataEtoGenerator;
+    private readonly IMessagePublishService _messagePublishService;
 
     protected CancellationToken CancellationToken = default;
 
     public BlockAcceptedEventHandlerTests()
     {
-        _kernelTestHelper = GetRequiredService<KernelTestHelper>();
+        _kernelTestHelper = GetRequiredService<MockChainHelper>();
         _syncBlockStateProvider = GetRequiredService<ISyncBlockStateProvider>();
         _syncBlockLatestHeightProvider = GetRequiredService<ISyncBlockLatestHeightProvider>();
         _blockMessageService = GetRequiredService<IBlockMessageService>();
@@ -45,6 +48,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         _sendMessageServer = GetRequiredService<ISendMessageService>();
         _newIrreversibleBlockFoundEventHandler = GetRequiredService<NewIrreversibleBlockFoundEventHandler>();
         _blockChainDataEtoGenerator = GetRequiredService<IBlockChainDataEtoGenerator>();
+        _messagePublishService = GetRequiredService<IMessagePublishService>();
     }
 
     /// <summary>
@@ -167,8 +171,8 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     public async Task AsyncRunningToSyncPrepared_ReceivedHeightIsNull_Test()
     {
         _syncBlockLatestHeightProvider.SetLatestHeight(_kernelTestHelper.BestBranchBlockList.Last().Height);
-        await _syncBlockStateProvider.UpdateStateAsync(1,SyncState.AsyncRunning);
-        await  _sendMessageServer.DoWorkAsync(3,5,CancellationToken);
+        await _syncBlockStateProvider.UpdateStateAsync(300,SyncState.AsyncRunning);
+        await  _sendMessageServer.DoWorkAsync(100,10,CancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         blockSyncState.State.ShouldBe(SyncState.SyncPrepared);
     } 
@@ -269,7 +273,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         
         await _blockAcceptedEventHandler.HandleEventAsync(blockAcceptedEvent); 
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.CurrentHeight.ShouldBe(101);
+        blockSyncState.CurrentHeight.ShouldBe(100);
         _syncBlockLatestHeightProvider.GetLatestHeight().ShouldBe(101);
     }
     
@@ -281,8 +285,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     public async Task DeleteUnderlibBlock_Test()
     {
         BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
-        var presHash = _kernelTestHelper.ForkBranchBlockList[4].GetHash();
-        Block block = _kernelTestHelper.GenerateBlock(9,presHash);
+        var block=_kernelTestHelper.BestBranchBlockList[9];
         blockExecutedSet.Block = block;
         await _blockMessageService.SendMessageAsync(blockExecutedSet);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
@@ -293,7 +296,7 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         _newIrreversibleBlockFoundEventHandler.HandleEventAsync(_event);
         
         blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.SentBlockHashs.Count.ShouldBe(6);
+        blockSyncState.SentBlockHashs.Count.ShouldBe(5);
 
     }
     
@@ -305,7 +308,6 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     {
         CancellationToken cancellationToken = default;
         var syncBlockHeight = await _blockMessageService.SendMessageAsync(30, 39, cancellationToken);
-        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
         syncBlockHeight.ShouldBe(40);
 
     }
@@ -315,14 +317,12 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     [Fact]
     public async Task BatchSend_AlreadySend_Test()
     {
-        
         CancellationToken cancellationToken = default;
         var syncBlockHeight = await _blockMessageService.SendMessageAsync(41, 50, cancellationToken);
         syncBlockHeight.ShouldBe(51);
         //send again
         syncBlockHeight = await _blockMessageService.SendMessageAsync(41, 50, cancellationToken);
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        
         var block=await  _blockChainDataEtoGenerator.GetBlockMessageEtoByHeightAsync(50, cancellationToken);
         var isTrue=blockSyncState.SentBlockHashs.ContainsKey(block.BlockHash);
         isTrue.ShouldBe(true);
@@ -332,9 +332,36 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     /// </summary>
     [Fact]
     public async Task BatchSend_HasContinuousFork_Test()
-    {
+    { 
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        CancellationToken cancellationToken = default;
+        List<BlockEto> Blocks = new List<BlockEto>();
         
+        var firstBlock=_kernelTestHelper.BestBranchBlockList[47];
+        var firstBlockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(firstBlock.GetHash());
+        await _syncBlockStateProvider.AddBlockHashAsync(firstBlockEto.BlockHash,
+            firstBlockEto.PreviousBlockHash,firstBlockEto.Height - 1);
+        
+            
+        for (int i = 48; i < 55; i++)
+        {
+            var block=_kernelTestHelper.BestBranchBlockList[i];
+            
+            var blockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.GetHash());
+            Blocks.Add(blockEto);
+        }
+        for (int i = 2; i < 5; i++)
+        {
+            var block=_kernelTestHelper.ForkBranchBlockList[i];
+            
+            var blockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.GetHash());
+            Blocks.Add(blockEto);
+        }
 
+        var nextHeight=await _messagePublishService.PublishListAsync(Blocks);
+        blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.SentBlockHashs.Count.ShouldBeGreaterThan(10);
+        nextHeight.ShouldBe(Blocks.Last().Height+1);
     }
     /// <summary>
     /// 18 Batch Send blocks (PublishListAsync) - the block received has a discontinuous fork block   
@@ -342,7 +369,43 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     [Fact]
     public async Task BatchSend_HasDiscontinuousFork_Test()
     {
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        CancellationToken cancellationToken = default;
+        List<BlockEto> Blocks = new List<BlockEto>();
         
+        var firstBlock=_kernelTestHelper.BestBranchBlockList[47];
+        var firstBlockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(firstBlock.GetHash());
+        await _syncBlockStateProvider.AddBlockHashAsync(firstBlockEto.BlockHash,
+            firstBlockEto.PreviousBlockHash,firstBlockEto.Height - 1);
+        
+            
+        for (int i = 48; i < 54; i++)
+        {
+            var block=_kernelTestHelper.BestBranchBlockList[i];
+            var blockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.GetHash());
+            Blocks.Add(blockEto);
+        }
+        // Add  two fork block
+        var forkBlock=_kernelTestHelper.ForkBranchBlockList[1];
+        var forkBlockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(forkBlock.GetHash());
+        
+        var forkBlock2=_kernelTestHelper.ForkBranchBlockList[3];
+        var forkBlockEto2=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(forkBlock2.GetHash());
+
+        Blocks.Add(forkBlockEto);
+        Blocks.Add(forkBlockEto2);
+        // Add two best block
+        var mainBlock1=_kernelTestHelper.BestBranchBlockList[55];
+        var mainBlockEto1=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(mainBlock1.GetHash());
+        var mainBlock2=_kernelTestHelper.BestBranchBlockList[57];
+        var mainBlockEto2=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(mainBlock2.GetHash());
+        Blocks.Add(mainBlockEto1);
+        Blocks.Add(mainBlockEto2);
+
+        var nextHeight=await _messagePublishService.PublishListAsync(Blocks);
+        blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.SentBlockHashs.Count.ShouldBe(15);
+        nextHeight.ShouldBe(Blocks.Last().Height+1);
 
     }
     
@@ -352,7 +415,41 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
     [Fact]
     public async Task BatchSend_AlreadySendFork_Test()
     {
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        CancellationToken cancellationToken = default;
+        List<BlockEto> Blocks = new List<BlockEto>();
         
+        var firstBlock=_kernelTestHelper.BestBranchBlockList[47];
+        var firstBlockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(firstBlock.GetHash());
+        await _syncBlockStateProvider.AddBlockHashAsync(firstBlockEto.BlockHash,
+            firstBlockEto.PreviousBlockHash,firstBlockEto.Height - 1);
+        
+            
+        for (int i = 48; i < 54; i++)
+        {
+            var block=_kernelTestHelper.BestBranchBlockList[i];
+            var blockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(block.GetHash());
+            Blocks.Add(blockEto);
+        }
+        for (int i = 1; i < 4; i++)
+        {
+            var forkBlock=_kernelTestHelper.ForkBranchBlockList[i];
+            var forkBlockEto=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(forkBlock.GetHash());
+            Blocks.Add(forkBlockEto);
+            //add cache
+            await _syncBlockStateProvider.AddBlockHashAsync(forkBlockEto.BlockHash,
+                forkBlockEto.PreviousBlockHash,forkBlockEto.Height - 1);
+        }
+
+        // Add the last best block
+        var mainBlock2=_kernelTestHelper.BestBranchBlockList[57];
+        var mainBlockEto2=await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(mainBlock2.GetHash());
+        Blocks.Add(mainBlockEto2);
+
+        var nextHeight=await _messagePublishService.PublishListAsync(Blocks);
+        blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.SentBlockHashs.Count.ShouldBe(14);
+        nextHeight.ShouldBe(Blocks.Last().Height+1);
 
     }
 }
