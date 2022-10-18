@@ -88,7 +88,7 @@ public class WebWebAppAElfModule : AElfModule
             options.ConventionalControllers.Create(typeof(NetApplicationWebAppAElfModule).Assembly,
                 setting => { setting.UrlControllerNameNormalizer = _ => "net"; });
             
-            options.ConventionalControllers.Create(typeof(MessageQueueRabbitMQAElfModule).Assembly,
+            options.ConventionalControllers.Create(typeof(MessageQueueAElfModule).Assembly,
                 setting => { setting.UrlControllerNameNormalizer = _ => "blockMessage"; });
         });
     }
