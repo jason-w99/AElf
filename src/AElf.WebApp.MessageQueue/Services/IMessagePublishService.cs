@@ -66,6 +66,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             //check datalist
             while (true)
             {
+                _logger.LogDebug($"PublishList blockSyncState SentBlockHash is contains block hash : {blockSyncState.SentBlockHashs.ContainsKey(block.BlockHash) } | StartPublishMessageHeight : {_messageQueueOptions.StartPublishMessageHeight }.");
                 if (blockSyncState.SentBlockHashs.ContainsKey(block.BlockHash) 
                     || block.Height < _messageQueueOptions.StartPublishMessageHeight )
                 {
@@ -74,6 +75,9 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 mainBlocks.Add(block);
                 //await _syncBlockStateProvider.AddBlockHashAsync(block.BlockHash,block.PreviousBlockHash, block.Height-1);
                 blockSyncState.SentBlockHashs.Add(block.BlockHash,new PreBlock(){BlockHash = block.PreviousBlockHash,Height = block.Height-1});
+                _logger.LogDebug($"PublishList blockSyncState SentBlockHash count: {blockSyncState.SentBlockHashs.Count} | Start publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
+                _logger.LogDebug($"PublishList blockSyncState mainBlocks count: {mainBlocks.Count} | Start publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
+
                 var preBlock = blocks.Find(c => c.BlockHash == block.PreviousBlockHash);
                 if (preBlock != null)
                 {
@@ -108,6 +112,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                         break;
                     }
                     saveForkBlocks.Add(forkBlock);
+                    _logger.LogDebug($"PublishList blockSyncState saveForkBlocks count: {forkBlocks.Count} | Start publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
                     blockSyncState.SentBlockHashs.Add(forkBlock.BlockHash,new PreBlock(){BlockHash = forkBlock.PreviousBlockHash,Height = forkBlock.Height-1});
                     var preBlock = blocks.Find(c => c.BlockHash == forkBlock.PreviousBlockHash);
                     if (preBlock != null)
@@ -122,9 +127,11 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             }
             
             long sendedHeight = blocks.Last().Height;
+            _logger.LogInformation($"PublishList -- publish last block height: {sendedHeight} .");
             if (mainBlocks.Count==0)
             {
                 await _syncBlockStateProvider.UpdateStateAsync(sendedHeight);
+                _logger.LogInformation($"PublishList Success(mainBlocks Count is 0)  publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
                 return sendedHeight+1;
             }
             mainBlocks = mainBlocks.OrderBy(c => c.Height).ToList();
@@ -144,7 +151,10 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             await _distributedEventBus.PublishAsync(blockChainDataEto);
             await _syncBlockStateProvider.UpdateBlocksHashAsync(blockSyncState.SentBlockHashs);
             await _syncBlockStateProvider.UpdateStateAsync(sendedHeight);
+            
+            _logger.LogInformation($"PublishList Success publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
             return sendedHeight +1;
+
         }
         catch (Exception e)
         {
