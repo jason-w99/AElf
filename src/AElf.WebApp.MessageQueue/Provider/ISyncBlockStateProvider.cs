@@ -54,15 +54,19 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             _blockSyncStateInformation = new SyncInformation
             {
                 CurrentHeight = _messageQueueOptions.StartPublishMessageHeight >= 1
-                    ? _messageQueueOptions.StartPublishMessageHeight - 1
+                    ? _messageQueueOptions.StartPublishMessageHeight
                     : 1
             };
         }
 
-        else if (_blockSyncStateInformation.CurrentHeight <
-                 _messageQueueOptions.StartPublishMessageHeight - 1)
+        else if (_blockSyncStateInformation.CurrentHeight <=
+                 _messageQueueOptions.StartPublishMessageHeight )
         {
-            _blockSyncStateInformation.CurrentHeight = _messageQueueOptions.StartPublishMessageHeight - 1;
+            _blockSyncStateInformation.CurrentHeight = _messageQueueOptions.StartPublishMessageHeight ;
+        }
+        else
+        {
+            _blockSyncStateInformation.CurrentHeight += 1 ;
         }
 
         _blockSyncStateInformation.State = _messageQueueOptions.Enable ? SyncState.Prepared : SyncState.Stopped;

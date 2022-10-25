@@ -44,7 +44,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         Dictionary<string, string> blockExtraProperties = new Dictionary<string, string>();
         blockExtraProperties.Add("Version",block.Header.Version.ToString());
         blockExtraProperties.Add("Bloom",block.Header.Bloom.ToBase64());
-        blockExtraProperties.Add("ExtraData",block.Header.ToString());
+        blockExtraProperties.Add("ExtraData",block.Header.ExtraData.ToString());
         blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
         blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
         blockEto.ExtraProperties = blockExtraProperties;
