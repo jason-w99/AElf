@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using AElf.Kernel.Blockchain;
+using Microsoft.Extensions.Logging;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.ObjectMapping;
 
@@ -9,10 +10,12 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
     ITransientDependency
 {
     private readonly IAutoObjectMappingProvider _mapperProvider;
+    private readonly ILogger<BlockChainDataMapper> _logger;
 
-    public BlockChainDataMapper(IAutoObjectMappingProvider mapperProvider)
+    public BlockChainDataMapper(IAutoObjectMappingProvider mapperProvider, ILogger<BlockChainDataMapper> logger)
     {
         _mapperProvider = mapperProvider;
+        _logger = logger;
     }
     
     public BlockEto Map(BlockExecutedSet source)
@@ -41,6 +44,12 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
             Signature=block.Header.Signature.ToHex(),
         };
         //blockEto's extra properties
+        var bloom = block.Header.Bloom.ToBase64();
+        if (bloom=="" )
+        {
+            _logger.LogInformation("block.Header.Bloom:"+block.Header.ToString());
+            
+        }
         Dictionary<string, string> blockExtraProperties = new Dictionary<string, string>();
         blockExtraProperties.Add("Version",block.Header.Version.ToString());
         blockExtraProperties.Add("Bloom",block.Header.Bloom.ToBase64());

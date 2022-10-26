@@ -158,7 +158,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         }
         catch (Exception e)
         {
-            _logger.LogError($"Failed to publish events to mq service.\n{e.Message}");
+            _logger.LogError(e,$"Failed to publish events to mq service.\n{e.Message}");
             return -1;
         }
     }
@@ -226,7 +226,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         }
         catch (Exception e)
         {
-            _logger.LogError($"Failed to publish events to mq service.\n{e.Message}");
+            _logger.LogError(e,$"Failed to publish events to mq service.\n{e.Message}");
             return false;
         }
     }
