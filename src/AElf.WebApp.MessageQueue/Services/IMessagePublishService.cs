@@ -218,6 +218,9 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 ChainId =message.ChainId,
                 Blocks = blockEtos.OrderBy(c=>c.Height).ToList()
             };
+          
+            _logger.LogInformation($"{runningPattern}  publish block count: {blockEtos.Count}.");
+            
             await _distributedEventBus.PublishAsync(blockChainDataEto);
             await _syncBlockStateProvider.UpdateBlocksHashAsync(blockSyncState.SentBlockHashs);
 
