@@ -63,6 +63,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             List<BlockEto> saveForkBlocks = new List<BlockEto>();
             
             var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+            
             //check datalist
             while (true)
             {
@@ -180,6 +181,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
         try
         {
             var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+            var blockSyncStateTemp = blockSyncState;
             List<BlockEto> blockEtos = new List<BlockEto>();
 
             var isContains = blockSyncState.SentBlockHashs.ContainsKey(message.BlockHash);
@@ -204,6 +206,9 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 {
                     break;
                 }
+                
+                _logger.LogDebug($" preHash hash: {preHash} and  height:{message.Height-i}");
+
                 i += 1;
                 var preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(preBlockId );
                 blockEtos.Add(preBlock);
@@ -224,7 +229,14 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
           
             _logger.LogInformation($"{runningPattern}  publish block count: {blockEtos.Count}. the block height is {message.Height} ");
 
-
+            if (blockEtos.Count>500)
+            {
+                foreach (var block in  blockSyncStateTemp.SentBlockHashs)
+                {
+                    _logger.LogDebug($" block hash: {block.Key}.and pre info height:{block.Value.Height} ___hash :{block.Value.BlockHash}");
+                }
+            }
+            
             var k = 0;
             while (true)
             {

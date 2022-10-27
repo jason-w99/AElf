@@ -25,6 +25,6 @@ public class NewIrreversibleBlockFoundEventHandler  : ILocalEventHandler<NewIrre
         _logger.LogInformation($" The new lib is: {eventData.BlockHeight}.");
 
         //The cache data before lib needs to be deleted 
-        //await _syncBlockStateProvider.DeleteBlockHashAsync(eventData.BlockHeight);
+        await _syncBlockStateProvider.DeleteBlockHashAsync(eventData.BlockHeight);
     }
 }
