@@ -185,7 +185,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             List<BlockEto> blockEtos = new List<BlockEto>();
 
             var isContains = blockSyncState.SentBlockHashs.ContainsKey(message.BlockHash);
-            _logger.LogInformation($"blockSyncState is contains the message height : {isContains}");
+            _logger.LogDebug($"blockSyncState is contains the message height : {isContains}");
             
             if (isContains
                 || message.BlockHash == Hash.Empty.ToString()
@@ -227,7 +227,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 Blocks = blockEtos.OrderBy(c=>c.Height).ToList()
             };
           
-            _logger.LogInformation($"{runningPattern}  publish block count: {blockEtos.Count}. the block height is {message.Height} ");
+            _logger.LogDebug($"{runningPattern}  publish block count: {blockEtos.Count}. the block height is {message.Height} ");
 
             if (blockEtos.Count>500)
             {

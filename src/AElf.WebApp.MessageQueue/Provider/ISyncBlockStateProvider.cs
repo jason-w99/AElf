@@ -159,6 +159,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
     }
     public async Task DeleteBlockHashAsync(long libHeight)
     {
+        libHeight -= 1;
         using (await SyncSemaphore.LockAsync())
         {
             if (_blockSyncStateInformation.CurrentHeight< libHeight)
