@@ -6,6 +6,7 @@ using AElf.Kernel.Blockchain;
 using AElf.Kernel.Blockchain.Application;
 using AElf.Kernel.Blockchain.Domain;
 using AElf.Types;
+using Google.Protobuf;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.ObjectMapping;
 
@@ -79,14 +80,12 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
             Signature=block.Header.Signature.ToHex(),
         };
         //blockEto's extra properties
-        var bloom = block.Header.Bloom.ToBase64();
-        if (bloom=="" )
-        {
-            _logger.LogInformation("block.Header.Bloom:"+block.Header.ToString());
-        }
+        
         Dictionary<string, string> blockExtraProperties = new Dictionary<string, string>();
         blockExtraProperties.Add("Version",block.Header.Version.ToString());
-        blockExtraProperties.Add("Bloom",block.Header.Bloom.ToBase64());
+        blockExtraProperties.Add("Bloom",block.Header.Bloom.Length == 0
+            ? ByteString.CopyFrom(new byte[256]).ToBase64()
+            : block.Header.Bloom.ToBase64());        
         blockExtraProperties.Add("ExtraData",block.Header.ExtraData.ToString());
         blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
         blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
@@ -133,7 +132,12 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
             transactionExtraProperties.Add("Version",block.Header.Version.ToString());
             transactionExtraProperties.Add("RefBlockNumber",transaction.RefBlockNumber.ToString());
             transactionExtraProperties.Add("RefBlockPrefix",transaction.RefBlockPrefix.ToHex());
-            transactionExtraProperties.Add("Bloom",transactionResult.Bloom.ToBase64());
+            //transactionExtraProperties.Add("Bloom",transactionResult.Bloom.ToBase64());
+            transactionExtraProperties.Add("Bloom",transactionResult.Status == TransactionResultStatus.NotExisted
+                ? null
+                : transactionResult.Bloom.Length == 0
+                    ? ByteString.CopyFrom(new byte[256]).ToBase64()
+                    : transactionResult.Bloom.ToBase64());
             transactionExtraProperties.Add("ReturnValue",transactionResult.ReturnValue.ToHex());
             transactionExtraProperties.Add("Error",transactionResult.Error);
 

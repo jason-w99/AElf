@@ -182,7 +182,10 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             var  blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
             List<BlockEto> blockEtos = new List<BlockEto>();
 
-            if (blockSyncState.SentBlockHashs.ContainsKey(message.BlockHash)
+            var isContains = blockSyncState.SentBlockHashs.ContainsKey(message.BlockHash);
+            _logger.LogInformation($"blockSyncState is contains the message height : {isContains}");
+            
+            if (isContains
                 || message.BlockHash == Hash.Empty.ToString()
                 || message.Height < _messageQueueOptions.StartPublishMessageHeight)
             {
