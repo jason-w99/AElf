@@ -219,11 +219,36 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 Blocks = blockEtos.OrderBy(c=>c.Height).ToList()
             };
           
-            _logger.LogInformation($"{runningPattern}  publish block count: {blockEtos.Count}.");
-            
-            await _distributedEventBus.PublishAsync(blockChainDataEto);
-            await _syncBlockStateProvider.UpdateBlocksHashAsync(blockSyncState.SentBlockHashs);
+            _logger.LogInformation($"{runningPattern}  publish block count: {blockEtos.Count}. the block height is {message.Height} ");
 
+
+            var k = 0;
+            while (true)
+            {
+                if (k==5)
+                {
+                    break;
+                }
+                try
+                {
+                    await _distributedEventBus.PublishAsync(blockChainDataEto);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,$"Failed to publish events to mq service.\n {ex.Message}__________"+message.Height+"retry count:"+k+1 );
+                    Thread.Sleep(1000);
+                    k += 1;
+                }
+            }
+
+
+
+            if (k==4)
+            {
+                return false;
+            }
+            await _syncBlockStateProvider.UpdateBlocksHashAsync(blockSyncState.SentBlockHashs);
             _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
             return true;
         }
