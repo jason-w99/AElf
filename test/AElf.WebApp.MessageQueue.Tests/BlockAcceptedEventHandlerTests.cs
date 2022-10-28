@@ -294,9 +294,10 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
         NewIrreversibleBlockFoundEvent _event = new NewIrreversibleBlockFoundEvent();
         _event.BlockHeight = 5;
         _newIrreversibleBlockFoundEventHandler.HandleEventAsync(_event);
+        var libHash = _kernelTestHelper.BestBranchBlockList.Find(c => c.Height == 5).GetHash();
         
         blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        blockSyncState.SentBlockHashs.Count.ShouldBe(5);
+        blockSyncState.SentBlockHashs.ContainsKey(libHash.ToHex()).ShouldBe(true);
 
     }
     
