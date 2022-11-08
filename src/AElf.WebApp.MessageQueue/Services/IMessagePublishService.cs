@@ -122,7 +122,10 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                         continue;
                     }
                     preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(forkBlock.PreviousBlockId);
-                    
+                    if (preBlock==null)
+                    {
+                        break;
+                    }
                     forkBlock = preBlock;
                 }
             }
@@ -211,6 +214,10 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
 
                 i += 1;
                 var preBlock = await _blockChainDataEtoGenerator.GetBlockMessageEtoByHashAsync(preBlockId );
+                if (preBlock == null)
+                {
+                    break;
+                }
                 blockEtos.Add(preBlock);
                 blockSyncState.SentBlockHashs.Add(preBlock.BlockHash,new PreBlock(){BlockHash=preBlock.PreviousBlockHash,Height = preBlock.Height-1});
                 preHash = preBlock.PreviousBlockHash;
