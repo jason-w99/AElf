@@ -88,7 +88,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                 Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
                 transactionExtraProperties.Add("Version",block.Header.Version.ToString());
                 transactionExtraProperties.Add("RefBlockNumber",transaction.RefBlockNumber.ToString());
-                transactionExtraProperties.Add("RefBlockPrefix",transaction.RefBlockPrefix.ToHex());
+                transactionExtraProperties.Add("RefBlockPrefix",transaction.RefBlockPrefix.ToBase64());
                 transactionExtraProperties.Add("Bloom",transactionResult.Status == TransactionResultStatus.NotExisted
                     ? null
                     : transactionResult.Bloom.Length == 0
@@ -116,7 +116,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                         //logEventEto's  extra properties
                         Dictionary<string, string> logEventEtoExtraProperties = new Dictionary<string, string>();
                         logEventEtoExtraProperties.Add("Indexed",logEvent.Indexed.ToString());
-                        logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToString());
+                        logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToBase64());
                         logEventEto.ExtraProperties = logEventEtoExtraProperties;
                    
                         logEvents.Add(logEventEto);
