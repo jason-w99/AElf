@@ -168,7 +168,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             {
                 if (_blockSyncStateInformation.CurrentHeight > _messageQueueOptions.ReservedCacheCount)
                 {
-                    libHeight = _blockSyncStateInformation.CurrentHeight - _messageQueueOptions.ReservedCacheCount>0?_blockSyncStateInformation.CurrentHeight - _messageQueueOptions.ReservedCacheCount:0 ;
+                    libHeight = _blockSyncStateInformation.CurrentHeight - _messageQueueOptions.ReservedCacheCount;
                     _logger.LogDebug($"The current status is that the push has not caught up with the receive ,To delete the previous data .the height is: {libHeight} ");
 
                 }
