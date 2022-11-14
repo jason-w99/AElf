@@ -164,10 +164,18 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         libHeight -= 1;
         using (await SyncSemaphore.LockAsync())
         {
-            if (_blockSyncStateInformation.CurrentHeight< libHeight && _blockSyncStateInformation.CurrentHeight > _messageQueueOptions.ReservedCacheCount)
+            if (_blockSyncStateInformation.CurrentHeight< libHeight  )
             {
-                libHeight = _blockSyncStateInformation.CurrentHeight - _messageQueueOptions.ReservedCacheCount;
-                _logger.LogDebug($"The current status is that the push has not caught up with the receive ,To delete the previous data .the height is: {libHeight} ");
+                if (_blockSyncStateInformation.CurrentHeight > _messageQueueOptions.ReservedCacheCount)
+                {
+                    libHeight = _blockSyncStateInformation.CurrentHeight - _messageQueueOptions.ReservedCacheCount>0?_blockSyncStateInformation.CurrentHeight - _messageQueueOptions.ReservedCacheCount:0 ;
+                    _logger.LogDebug($"The current status is that the push has not caught up with the receive ,To delete the previous data .the height is: {libHeight} ");
+
+                }
+                else
+                {
+                    return;
+                }
             }
             List<string> keys = new List<string>();
             foreach (var sendBolck in _blockSyncStateInformation.SentBlockHashs)
