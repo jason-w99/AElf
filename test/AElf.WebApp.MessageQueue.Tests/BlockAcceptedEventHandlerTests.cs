@@ -301,6 +301,26 @@ public  class BlockAcceptedEventHandlerTests:AElfIntegratedTest<WebAppMessageQue
 
     }
     
+    [Fact]
+    public async Task DeleteUnderlibBlock02_Test()
+    {
+        BlockExecutedSet blockExecutedSet = new BlockExecutedSet();
+        var block=_kernelTestHelper.BestBranchBlockList[5];
+        blockExecutedSet.Block = block;
+        await _blockMessageService.SendMessageAsync(blockExecutedSet);
+        var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.SentBlockHashs.Count.ShouldBeGreaterThan(5);
+
+        NewIrreversibleBlockFoundEvent _event = new NewIrreversibleBlockFoundEvent();
+        _event.BlockHeight = 8;
+        _newIrreversibleBlockFoundEventHandler.HandleEventAsync(_event);
+        var libHash = _kernelTestHelper.BestBranchBlockList.Find(c => c.Height == 8).GetHash();
+        
+        blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        blockSyncState.SentBlockHashs.Count.ShouldBe(3);
+
+    }
+    
     /// <summary>
     /// 15 Batch Send blocks (PublishListAsync) - To receive a set of blocks without forks
     /// </summary>

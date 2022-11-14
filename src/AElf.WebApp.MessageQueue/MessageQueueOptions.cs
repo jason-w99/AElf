@@ -8,4 +8,6 @@ public class MessageQueueOptions
     public int Period { get; set; } = 1000;
     public int BlockCountPerPeriod { get; set; } = 100;
     public int ParallelCount { get; set; } = 5;
+    public int ReservedCacheCount { get; set; } = 3;
+    
 }
