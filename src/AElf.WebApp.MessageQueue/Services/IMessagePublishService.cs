@@ -75,7 +75,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 }
                 mainBlocks.Add(block);
                 //await _syncBlockStateProvider.AddBlockHashAsync(block.BlockHash,block.PreviousBlockHash, block.Height-1);
-                blockSyncState.SentBlockHashs.Add(block.BlockHash,new PreBlock(){BlockHash = block.PreviousBlockHash,Height = block.Height-1});
+                blockSyncState.SentBlockHashs.TryAdd(block.BlockHash,new PreBlock(){BlockHash = block.PreviousBlockHash,Height = block.Height-1});
                 _logger.LogDebug($"PublishList blockSyncState SentBlockHash count: {blockSyncState.SentBlockHashs.Count} | Start publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
                 _logger.LogDebug($"PublishList blockSyncState mainBlocks count: {mainBlocks.Count} | Start publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
 
@@ -114,7 +114,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                     }
                     saveForkBlocks.Add(forkBlock);
                     _logger.LogDebug($"PublishList blockSyncState saveForkBlocks count: {forkBlocks.Count} | Start publish block: {blocks.First().Height} ~{blocks.Last().Height }.");
-                    blockSyncState.SentBlockHashs.Add(forkBlock.BlockHash,new PreBlock(){BlockHash = forkBlock.PreviousBlockHash,Height = forkBlock.Height-1});
+                    blockSyncState.SentBlockHashs.TryAdd(forkBlock.BlockHash,new PreBlock(){BlockHash = forkBlock.PreviousBlockHash,Height = forkBlock.Height-1});
                     var preBlock = blocks.Find(c => c.BlockHash == forkBlock.PreviousBlockHash);
                     if (preBlock != null)
                     {
@@ -197,7 +197,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 return true;
             }
             blockEtos.Add(message);
-            blockSyncState.SentBlockHashs.Add(message.BlockHash,new PreBlock(){BlockHash=message.PreviousBlockHash,Height = message.Height-1});
+            blockSyncState.SentBlockHashs.TryAdd(message.BlockHash,new PreBlock(){BlockHash=message.PreviousBlockHash,Height = message.Height-1});
             var preHash = message.PreviousBlockHash;
             var preBlockId = message.PreviousBlockId;
             int i = 1;
@@ -219,7 +219,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                     break;
                 }
                 blockEtos.Add(preBlock);
-                blockSyncState.SentBlockHashs.Add(preBlock.BlockHash,new PreBlock(){BlockHash=preBlock.PreviousBlockHash,Height = preBlock.Height-1});
+                blockSyncState.SentBlockHashs.TryAdd(preBlock.BlockHash,new PreBlock(){BlockHash=preBlock.PreviousBlockHash,Height = preBlock.Height-1});
                 preHash = preBlock.PreviousBlockHash;
                 preBlockId = preBlock.PreviousBlockId;
             }

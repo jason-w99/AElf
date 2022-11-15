@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -19,8 +20,8 @@ public interface ISyncBlockStateProvider
     Task UpdateStateAsync(long? height, SyncState? state = null, SyncState? expectationState = null);
 
     Task AddBlockHashAsync(string blockHash, string preBlockHash,long preHeight);
-    Task AddBlocksHashAsync(Dictionary<string, PreBlock> blocksHash);
-    Task UpdateBlocksHashAsync(Dictionary<string, PreBlock> blocksHash);
+    Task AddBlocksHashAsync(ConcurrentDictionary<string, PreBlock> blocksHash);
+    Task UpdateBlocksHashAsync(ConcurrentDictionary<string, PreBlock> blocksHash);
     Task DeleteBlockHashAsync(long libHeight);
     
     
@@ -73,7 +74,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         _blockSyncStateInformation.State = _messageQueueOptions.Enable ? SyncState.Prepared : SyncState.Stopped;
         if (_blockSyncStateInformation.SentBlockHashs==null || _blockSyncStateInformation.SentBlockHashs.Count==0)
         {
-            _blockSyncStateInformation.SentBlockHashs = new Dictionary<string, PreBlock>();
+            _blockSyncStateInformation.SentBlockHashs = new ConcurrentDictionary<string, PreBlock>();
         }
         
         
@@ -120,7 +121,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         
         using (await SyncSemaphore.LockAsync())
         {
-            _blockSyncStateInformation.SentBlockHashs.Add(blockHash,new PreBlock(){BlockHash = preBlockHash,Height = preHeight});
+            _blockSyncStateInformation.SentBlockHashs.TryAdd(blockHash,new PreBlock(){BlockHash = preBlockHash,Height = preHeight});
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
 
@@ -128,7 +129,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             $"BlockSyncState AddBlockHashAsync, blockHash: {blockHash}  preBlockHash: {preBlockHash}");
     }
     
-    public async Task AddBlocksHashAsync(Dictionary<string, PreBlock> blocksHash)
+    public async Task AddBlocksHashAsync(ConcurrentDictionary<string, PreBlock> blocksHash)
     {
         using (await SyncSemaphore.LockAsync())
         {
@@ -136,7 +137,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             {
                 if (!_blockSyncStateInformation.SentBlockHashs.ContainsKey(kvp.Key))
                 {
-                    _blockSyncStateInformation.SentBlockHashs.Add(kvp.Key,kvp.Value);
+                    _blockSyncStateInformation.SentBlockHashs.TryAdd(kvp.Key,kvp.Value);
                 }
             }
             /*Dictionary<string, PreBlock> temp = new Dictionary<string, PreBlock>();
@@ -148,7 +149,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             $"BlockSyncState AddBlocksHashAsync ");
     }
     
-    public async Task UpdateBlocksHashAsync(Dictionary<string, PreBlock> blocksHash)
+    public async Task UpdateBlocksHashAsync(ConcurrentDictionary<string, PreBlock> blocksHash)
     {
         using (await SyncSemaphore.LockAsync())
         {
@@ -177,19 +178,20 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
                     return;
                 }
             }
-            List<string> keys = new List<string>();
+            //List<string> keys = new List<string>();
+            ConcurrentDictionary<string, PreBlock> deleteList = new ConcurrentDictionary<string, PreBlock>();
             foreach (var sendBolck in _blockSyncStateInformation.SentBlockHashs)
             {
                 if (sendBolck.Value.Height<libHeight)
                 {
-                    keys.Add(sendBolck.Key);
+                    //keys.Add(sendBolck.Key);
+                    deleteList.TryAdd(sendBolck.Key,sendBolck.Value);
                 }
-                
             }
 
-            foreach (var key in keys)
+            foreach (var key in deleteList)
             {
-                _blockSyncStateInformation.SentBlockHashs.Remove(key);
+                _blockSyncStateInformation.SentBlockHashs.TryRemove(key);
             }
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
@@ -203,7 +205,7 @@ public class SyncInformation
 {
     public long CurrentHeight { get; set; }
     public SyncState State { get; set; }
-    public Dictionary<string, PreBlock> SentBlockHashs { set; get; }
+    public ConcurrentDictionary<string, PreBlock> SentBlockHashs { set; get; }
 }
 
 public class PreBlock
