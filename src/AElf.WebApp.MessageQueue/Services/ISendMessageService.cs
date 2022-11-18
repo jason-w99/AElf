@@ -28,7 +28,7 @@ public class SendMessageService :ISendMessageService
     {
         
         var currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        var nextHeight = currentState.CurrentHeight;
+        var nextHeight = currentState.CurrentHeight+1;
 
         var remainCount = blockCount;
         while (IsContinue(remainCount, currentState.State,cancellationToken))

@@ -1,10 +1,12 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using AElf.Modularity;
 using AElf.WebApp.Application;
 using AElf.WebApp.MessageQueue.Enum;
 using AElf.WebApp.MessageQueue.Helpers;
 using AElf.WebApp.MessageQueue.Provider;
 using AElf.WebApp.MessageQueue.Services;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp;
@@ -33,6 +35,16 @@ public class MessageQueueAElfModule : AElfModule
         context.Services.AddTransient<IBlockMessageEtoGenerator, TransactionListEtoGenerator>();
         context.Services.AddTransient<IBlockChainDataEtoGenerator, BlockChainDataEtoGenerator>();
         context.Services.AddTransient<ISendMessageService, SendMessageService>();
+        var chainId = configuration.GetSection("MessageQueue:ChainId").Value;
+        Configure<AbpDistributedCacheOptions>(options =>
+        {
+            options.KeyPrefix =$"BlockSyncState-{chainId}";
+            options.GlobalCacheEntryOptions = new DistributedCacheEntryOptions()
+            {
+                AbsoluteExpiration=DateTimeOffset.Now.AddYears(100)
+            };
+        });
+        
     }
 
     

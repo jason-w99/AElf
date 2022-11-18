@@ -56,20 +56,17 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             _blockSyncStateInformation = new SyncInformation
             {
                 CurrentHeight = _messageQueueOptions.StartPublishMessageHeight >= 1
-                    ? _messageQueueOptions.StartPublishMessageHeight
-                    : 1
+                    ? _messageQueueOptions.StartPublishMessageHeight-1
+                    : 0
             };
         }
 
         else if (_blockSyncStateInformation.CurrentHeight <=
                  _messageQueueOptions.StartPublishMessageHeight )
         {
-            _blockSyncStateInformation.CurrentHeight = _messageQueueOptions.StartPublishMessageHeight ;
+            _blockSyncStateInformation.CurrentHeight = _messageQueueOptions.StartPublishMessageHeight-1 ;
         }
-        else
-        {
-            _blockSyncStateInformation.CurrentHeight += 1 ;
-        }
+
 
         _blockSyncStateInformation.State = _messageQueueOptions.Enable ? SyncState.Prepared : SyncState.Stopped;
         if (_blockSyncStateInformation.SentBlockHashs==null || _blockSyncStateInformation.SentBlockHashs.Count==0)
@@ -79,7 +76,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         
         
         _logger.LogInformation(
-            $"BlockSyncState initialized, State: {_blockSyncStateInformation.State}  CurrentHeight: {_blockSyncStateInformation.CurrentHeight}");
+            $"BlockSyncState initialized, State: {_blockSyncStateInformation.State}  CurrentHeight: {_blockSyncStateInformation.CurrentHeight +1}");
     }
 
     public async Task<SyncInformation> GetCurrentStateAsync()

@@ -97,13 +97,13 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
         await _sendMessageByDesignateHeightTaskManager.StopAsync();
         var currentHeight = eventData.Block.Height;
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        if (blockSyncState.CurrentHeight >= currentHeight)
+        if (blockSyncState.CurrentHeight+1 >= currentHeight)
         {
             return;
         }
 
-        var from = blockSyncState.CurrentHeight;
-        var to = currentHeight - 2;
+        var from = blockSyncState.CurrentHeight+1;
+        var to = currentHeight - 1;
         if (from > to + 1 || to - from > 10)
         {
             await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.Prepared);
