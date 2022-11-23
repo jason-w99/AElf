@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AElf.WebApp.MessageQueue.Enum;
 using AElf.WebApp.MessageQueue.Provider;
+using Microsoft.Extensions.Logging;
 
 namespace AElf.WebApp.MessageQueue.Services;
 
@@ -16,18 +17,20 @@ public class SendMessageService :ISendMessageService
     private readonly ISyncBlockStateProvider _syncBlockStateProvider;
     private readonly IBlockMessageService _blockMessageService;
     private readonly ISyncBlockLatestHeightProvider _latestHeightProvider;
-    
+    private readonly ILogger<MessagePublishService> _logger;
+
     public SendMessageService(ISyncBlockStateProvider syncBlockStateProvider,
-        ISyncBlockLatestHeightProvider latestHeightProvider, IBlockMessageService blockMessageService) 
+        ISyncBlockLatestHeightProvider latestHeightProvider, IBlockMessageService blockMessageService, ILogger<MessagePublishService> logger) 
     {
         _syncBlockStateProvider = syncBlockStateProvider;
         _latestHeightProvider = latestHeightProvider;
         _blockMessageService = blockMessageService;
+        _logger = logger;
     }
     public  async Task DoWorkAsync(int blockCount,int parallelCount,CancellationToken cancellationToken)
     {
-        
         var currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        _logger.LogInformation($"DoWorkAsync start!  CurrentHeight is {currentState.CurrentHeight}");
         var nextHeight = currentState.CurrentHeight+1;
 
         var remainCount = blockCount;
@@ -53,6 +56,7 @@ public class SendMessageService :ISendMessageService
             nextHeight = syncBlockHeight;
             currentState = await _syncBlockStateProvider.GetCurrentStateAsync();
         }
+        _logger.LogInformation($"DoWorkAsync End!! CurrentHeight is {currentState.CurrentHeight}");
         /*var startCount = 0;
         while (IsContinue(startCount++, currentState.State,cancellationToken))
         {

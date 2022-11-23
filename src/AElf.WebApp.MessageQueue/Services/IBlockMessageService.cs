@@ -58,6 +58,7 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
 
     public async Task<long> SendMessageAsync(long from, long to, CancellationToken cts)
     {
+        _logger.LogInformation($"Start querying blocks from{from} ~ to{to}");
         var queryTasks = new List<Task>();
         var blockMessageList = new ConcurrentBag<BlockEto>();
         for (var i = from; i <= to; i++)
