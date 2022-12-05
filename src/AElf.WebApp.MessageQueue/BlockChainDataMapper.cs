@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using AElf.Kernel.Blockchain;
+using AElf.Kernel.FeeCalculation.Extensions;
 using AElf.Types;
 using Google.Protobuf;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.ObjectMapping;
 
@@ -38,7 +40,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
             Height = blockHeight,
             ChainId = ChainHelper.ConvertChainIdToBase58(block.Header.ChainId),
             BlockHash=blockHashStr,
-            BlockNumber= blockHeight,
+            BlockHeight= blockHeight,
             PreviousBlockId=block.Header.PreviousBlockHash,
             PreviousBlockHash= block.Header.PreviousBlockHash.ToHex(),
             BlockTime=blockTime,
@@ -55,6 +57,8 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         blockExtraProperties.Add("ExtraData",block.Header.ExtraData.ToString());
         blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
         blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
+        blockExtraProperties.Add("BlockSize",block.CalculateSize().ToString());
+
         blockEto.ExtraProperties = blockExtraProperties;
 
         List<TransactionEto> transactions = new List<TransactionEto>();
@@ -96,6 +100,9 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                         : transactionResult.Bloom.ToBase64());
                 transactionExtraProperties.Add("ReturnValue",transactionResult.ReturnValue.ToHex());
                 transactionExtraProperties.Add("Error",transactionResult.Error);
+                transactionExtraProperties.Add("TransactionSize",transaction.CalculateSize().ToString());
+                transactionExtraProperties.Add("TransactionFee", JsonConvert.SerializeObject(transactionResult.GetChargedTransactionFees()));
+                transactionExtraProperties.Add("ResourceFee", JsonConvert.SerializeObject(transactionResult.GetConsumedResourceTokens()));
 
                 transactionEto.ExtraProperties = transactionExtraProperties;
 
