@@ -5,8 +5,6 @@ using System.Threading.Tasks;
 using AElf.Modularity;
 using AElf.WebApp.Application.Chain;
 using AElf.WebApp.Application.Net;
-using AElf.WebApp.MessageQueue;
-using AElf.WebApp.MessageQueue.RabbitMQ;
 using Google.Protobuf;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -30,13 +28,14 @@ using Volo.Abp.Authorization;
 using Volo.Abp.Castle;
 using Volo.Abp.Castle.DynamicProxy;
 using Volo.Abp.Modularity;
+using Volo.Abp.Modularity.PlugIns;
 
 namespace AElf.WebApp.Web;
 
 [DependsOn(
     typeof(ChainApplicationWebAppAElfModule),
     typeof(NetApplicationWebAppAElfModule),
-    typeof(MessageQueueRabbitMQAElfModule),
+    //typeof(MessageQueueRabbitMQAElfModule),
     typeof(AbpCastleCoreModule),
     typeof(WebAppAbpAspNetCoreMvcModule))]
 public class WebWebAppAElfModule : AElfModule
@@ -44,6 +43,7 @@ public class WebWebAppAElfModule : AElfModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var configuration = context.Services.GetConfiguration();
+        
 
         context.Services.Replace(
             ServiceDescriptor.Transient<IConventionalRouteBuilder, AElfConventionalRouteBuilder>());
@@ -76,6 +76,7 @@ public class WebWebAppAElfModule : AElfModule
             .AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>("BasicAuthentication", null);
 
         Configure<BasicAuthOptions>(options => { configuration.GetSection("BasicAuth").Bind(options); });
+    
     }
 
     private void ConfigureAutoApiControllers()
@@ -88,8 +89,9 @@ public class WebWebAppAElfModule : AElfModule
             options.ConventionalControllers.Create(typeof(NetApplicationWebAppAElfModule).Assembly,
                 setting => { setting.UrlControllerNameNormalizer = _ => "net"; });
             
-            options.ConventionalControllers.Create(typeof(MessageQueueAElfModule).Assembly,
-                setting => { setting.UrlControllerNameNormalizer = _ => "blockMessage"; });
+            /*options.ConventionalControllers.Create(typeof(MessageQueueAElfModule).Assembly,
+                setting => { setting.UrlControllerNameNormalizer = _ => "blockMessage"; });*/
+            
         });
     }
 

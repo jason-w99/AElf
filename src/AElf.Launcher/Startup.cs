@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp.Modularity;
+using Volo.Abp.Modularity.PlugIns;
 
 namespace AElf.Launcher;
 
@@ -31,13 +32,22 @@ public class Startup
         switch (chainType)
         {
             case ChainType.SideChain:
-                AddApplication<SideChainAElfModule>(services);
+                //AddApplication<SideChainAElfModule>(services);
+                services.AddApplication<SideChainAElfModule>(options =>
+                {
+                    options.PlugInSources.AddFolder("/Users/wangshuangzhe/Documents/plugIns");
+                });
                 break;
             default:
-                AddApplication<MainChainAElfModule>(services);
+                //AddApplication<MainChainAElfModule>(services);
+                services.AddApplication<MainChainAElfModule>(options =>
+                {
+                    options.PlugInSources.AddFolder("/Users/wangshuangzhe/Documents/plugIns");
+                });
                 break;
         }
 
+        
         services.AddCors(options =>
         {
             options.AddPolicy(DefaultCorsPolicyName, builder =>
