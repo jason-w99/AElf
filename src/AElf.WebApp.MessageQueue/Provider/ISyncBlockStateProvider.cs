@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using AElf.WebApp.MessageQueue.Enum;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Volo.Abp.Caching;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Threading;
@@ -154,7 +155,7 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
         _logger.LogInformation(
-            $"BlockSyncState AddBlocksHashAsync ");
+            $"BlockSyncState UpdateBlocksHashAsync blocksHash is {JsonConvert.SerializeObject(blocksHash)}");
     }
     public async Task DeleteBlockHashAsync(long libHeight)
     {

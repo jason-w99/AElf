@@ -9,6 +9,7 @@ using AElf.WebApp.MessageQueue.Helpers;
 using AElf.WebApp.MessageQueue.Provider;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.EventBus.Distributed;
 
@@ -71,6 +72,7 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 if (blockSyncState.SentBlockHashs.ContainsKey(block.BlockHash) 
                     || block.Height < _messageQueueOptions.StartPublishMessageHeight )
                 {
+                    _logger.LogDebug($"PublishList blockSyncState SentBlockHash json is  : { JsonConvert.SerializeObject(blockSyncState.SentBlockHashs)} | block.BlockHash is {block.BlockHash}");
                     break;
                 }
                 mainBlocks.Add(block);
