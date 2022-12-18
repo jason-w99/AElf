@@ -21,11 +21,8 @@ public interface ISyncBlockStateProvider
     Task UpdateStateAsync(long? height, SyncState? state = null, SyncState? expectationState = null);
 
     Task AddBlockHashAsync(string blockHash, string preBlockHash,long preHeight);
-    Task AddBlocksHashAsync(ConcurrentDictionary<string, PreBlock> blocksHash);
     Task UpdateBlocksHashAsync(ConcurrentDictionary<string, PreBlock> blocksHash);
     Task DeleteBlockHashAsync(long libHeight);
-    
-    
 }
 
 public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDependency
@@ -124,28 +121,9 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         }
 
         _logger.LogInformation(
-            $"BlockSyncState AddBlockHashAsync, blockHash: {blockHash}  preBlockHash: {preBlockHash}");
+            $"BlockSyncState AddBlockHashAsync, blockHash: {blockHash}  preBlockHash: {preBlockHash} preHeight:{preHeight}");
     }
     
-    public async Task AddBlocksHashAsync(ConcurrentDictionary<string, PreBlock> blocksHash)
-    {
-        using (await SyncSemaphore.LockAsync())
-        {
-            foreach (KeyValuePair<string, PreBlock> kvp in blocksHash)
-            {
-                if (!_blockSyncStateInformation.SentBlockHashs.ContainsKey(kvp.Key))
-                {
-                    _blockSyncStateInformation.SentBlockHashs.TryAdd(kvp.Key,kvp.Value);
-                }
-            }
-            /*Dictionary<string, PreBlock> temp = new Dictionary<string, PreBlock>();
-            temp= _blockSyncStateInformation.SentBlockHashs.Concat(blocksHash).ToDictionary(k => k.Key, v => v.Value);
-            _blockSyncStateInformation.SentBlockHashs = temp;*/
-            await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
-        }
-        _logger.LogInformation(
-            $"BlockSyncState AddBlocksHashAsync ");
-    }
     
     public async Task UpdateBlocksHashAsync(ConcurrentDictionary<string, PreBlock> blocksHash)
     {
@@ -154,8 +132,12 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             _blockSyncStateInformation.SentBlockHashs = blocksHash;
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
-        _logger.LogInformation(
-            $"BlockSyncState UpdateBlocksHashAsync blocksHash is {JsonConvert.SerializeObject(blocksHash)}");
+        _logger.LogInformation("BlockSyncState UpdateBlocksHashAsync ");
+        foreach (var preBlock in blocksHash)
+        {
+            _logger.LogDebug($"UpdateBlocksHashAsync blocksHash.Key: { preBlock.Key} | blocksHash.value is {JsonConvert.SerializeObject(preBlock.Value)}");
+        }
+        
     }
     public async Task DeleteBlockHashAsync(long libHeight)
     {

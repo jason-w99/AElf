@@ -72,7 +72,10 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 if (blockSyncState.SentBlockHashs.ContainsKey(block.BlockHash) 
                     || block.Height < _messageQueueOptions.StartPublishMessageHeight )
                 {
-                    _logger.LogDebug($"PublishList blockSyncState SentBlockHash json is  : { JsonConvert.SerializeObject(blockSyncState.SentBlockHashs)} | block.BlockHash is {block.BlockHash}");
+                    foreach (var preBlock1 in blockSyncState.SentBlockHashs)
+                    {
+                        _logger.LogDebug($"PublishList blockSyncState SentBlockHash { preBlock1.Key} |  {JsonConvert.SerializeObject(preBlock1.Value)}");
+                    }
                     break;
                 }
                 mainBlocks.Add(block);
