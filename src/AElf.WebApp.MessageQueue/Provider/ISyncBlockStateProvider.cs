@@ -137,7 +137,6 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
         {
             _logger.LogDebug($"UpdateBlocksHashAsync blocksHash.Key: { preBlock.Key} | blocksHash.value is {JsonConvert.SerializeObject(preBlock.Value)}");
         }
-        
     }
     public async Task DeleteBlockHashAsync(long libHeight)
     {
