@@ -35,13 +35,13 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
     public async Task HandleEventAsync(BlockAcceptedEvent eventData)
     {
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        if (blockSyncState.SentBlockHashs.Count>0)
+        /*if (blockSyncState.SentBlockHashs.Count>0)
         {
             foreach (var preBlock in blockSyncState.SentBlockHashs)
             {
                 _logger.LogDebug($"BlockAcceptedEventHandler HandleEventAsync  blocksHash.Key: { preBlock.Key} | blocksHash.value is {JsonConvert.SerializeObject(preBlock.Value)}");
             }
-        }
+        }*/
         switch (blockSyncState.State)
         {
             case SyncState.Stopped:

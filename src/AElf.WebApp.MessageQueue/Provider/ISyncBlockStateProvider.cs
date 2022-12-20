@@ -133,10 +133,10 @@ public class SyncBlockStateProvider : ISyncBlockStateProvider, ISingletonDepende
             await _distributedCache.SetAsync(_blockSynState, _blockSyncStateInformation);
         }
         _logger.LogInformation("BlockSyncState UpdateBlocksHashAsync ");
-        foreach (var preBlock in blocksHash)
+        /*foreach (var preBlock in blocksHash)
         {
             _logger.LogDebug($"UpdateBlocksHashAsync blocksHash.Key: { preBlock.Key} | blocksHash.value is {JsonConvert.SerializeObject(preBlock.Value)}");
-        }
+        }*/
     }
     public async Task DeleteBlockHashAsync(long libHeight)
     {
