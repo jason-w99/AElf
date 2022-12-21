@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using AElf.Kernel.Blockchain;
 using AElf.Kernel.FeeCalculation.Extensions;
 using AElf.Types;
+using AElf.WebApp.MessageQueue.Helpers;
 using Google.Protobuf;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -15,11 +16,13 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
 {
     private readonly IAutoObjectMappingProvider _mapperProvider;
     private readonly ILogger<BlockChainDataMapper> _logger;
+    private readonly ITransformEtoHelper _transformEtoHelper;
 
-    public BlockChainDataMapper(IAutoObjectMappingProvider mapperProvider, ILogger<BlockChainDataMapper> logger)
+    public BlockChainDataMapper(IAutoObjectMappingProvider mapperProvider, ILogger<BlockChainDataMapper> logger, ITransformEtoHelper transformEtoHelper)
     {
         _mapperProvider = mapperProvider;
         _logger = logger;
+        _transformEtoHelper = transformEtoHelper;
     }
     
     public BlockEto Map(BlockExecutedSet source)
@@ -29,8 +32,8 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         {
             ChainId =ChainHelper.ConvertChainIdToBase58(block.Header.ChainId)
         };
-
-        var blockHash = block.Header.GetHash();
+        var blockEto =  _transformEtoHelper.ToBlockEtoAsync(block);
+        /*var blockHash = block.Header.GetHash();
         var blockHashStr = blockHash.ToHex();
         var blockHeight = block.Height;
         var blockTime = block.Header.Time.ToDateTime();
@@ -59,7 +62,7 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
         blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
         blockExtraProperties.Add("BlockSize",block.CalculateSize().ToString());
 
-        blockEto.ExtraProperties = blockExtraProperties;
+        blockEto.ExtraProperties = blockExtraProperties;*/
 
         List<TransactionEto> transactions = new List<TransactionEto>();
         if (source.TransactionResultMap!=null)
@@ -75,7 +78,10 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                 {
                     continue;
                 }
-                TransactionEto transactionEto = new TransactionEto()
+
+                TransactionEto transactionEto =
+                    _transformEtoHelper.ToTransactionEtoAsync(transaction, transactionResult, transactionIndex,eventIndex, txId,block.Header.Version.ToString());
+                /*TransactionEto transactionEto = new TransactionEto()
                 {
                     TransactionId = txId,
                     From = transaction.From.ToBase58(),
@@ -129,12 +135,8 @@ public class BlockChainDataMapper: IObjectMapper<BlockExecutedSet, BlockEto>,
                         logEvents.Add(logEventEto);
                         eventIndex += 1;
                     }
-
-                    
                 }
-                
-                transactionEto.LogEvents = logEvents;
-                
+                transactionEto.LogEvents = logEvents;*/
                 transactions.Add(transactionEto);
             }
         }

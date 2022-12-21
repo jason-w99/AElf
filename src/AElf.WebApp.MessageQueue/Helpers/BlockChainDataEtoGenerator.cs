@@ -24,16 +24,19 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
     private readonly ITransactionManager _transactionManager;
     private readonly IObjectMapper _objectMapper;
     private readonly ILogger<TransactionListEtoGenerator> _logger;
+    private readonly ITransformEtoHelper _transformEtoHelper;
+
     
     public BlockChainDataEtoGenerator(IBlockchainService blockchainService,
         ITransactionResultQueryService transactionResultQueryService, ITransactionManager transactionManager,
-        IObjectMapper objectMapper, ILogger<TransactionListEtoGenerator> logger)
+        IObjectMapper objectMapper, ILogger<TransactionListEtoGenerator> logger, ITransformEtoHelper transformEtoHelper)
     {
         _blockchainService = blockchainService;
         _transactionResultQueryService = transactionResultQueryService;
         _transactionManager = transactionManager;
         _objectMapper = objectMapper;
         _logger = logger;
+        _transformEtoHelper = transformEtoHelper;
     }
     
    
@@ -69,8 +72,8 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         var blockHashStr = blockHash.ToHex();
         var blockHeight = block.Height;
         var blockTime = block.Header.Time.ToDateTime();
-        
-        BlockEto blockEto = new BlockEto()
+        BlockEto blockEto = _transformEtoHelper.ToBlockEtoAsync(block);
+        /*BlockEto blockEto = new BlockEto()
         {
             ChainId = ChainHelper.ConvertChainIdToBase58(block.Header.ChainId),
             Height=blockHeight,
@@ -94,7 +97,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
         blockExtraProperties.Add("BlockSize",block.CalculateSize().ToString());
         
-        blockEto.ExtraProperties = blockExtraProperties;
+        blockEto.ExtraProperties = blockExtraProperties;*/
         //blockEto.SetVersion();
         List<TransactionEto> transactions = new List<TransactionEto>();
         int transactionIndex = 0;
@@ -120,7 +123,10 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
                 _logger.LogWarning($"Failed to find transaction, block hash: {blockHash},  transaction ID: {txId}");
                 continue;
             }
-            TransactionEto transactionEto = new TransactionEto()
+            TransactionEto transactionEto =
+                _transformEtoHelper.ToTransactionEtoAsync(transaction, transactionResult, transactionIndex,eventIndex, txId.ToHex(),block.Header.Version.ToString());
+
+            /*TransactionEto transactionEto = new TransactionEto()
             {
                 TransactionId = txId.ToHex(),
                 From = transaction.From.ToBase58(),
@@ -172,7 +178,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
                 logEvents.Add(logEventEto);
                 eventIndex += 1;
             }
-            transactionEto.LogEvents = logEvents;
+            transactionEto.LogEvents = logEvents;*/
             transactions.Add(transactionEto);
         }
         blockEto.Transactions = transactions;

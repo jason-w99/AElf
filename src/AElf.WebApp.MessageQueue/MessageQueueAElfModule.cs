@@ -35,6 +35,7 @@ public class MessageQueueAElfModule : AElfModule
         context.Services.AddTransient<IBlockMessageEtoGenerator, TransactionListEtoGenerator>();
         context.Services.AddTransient<IBlockChainDataEtoGenerator, BlockChainDataEtoGenerator>();
         context.Services.AddTransient<ISendMessageService, SendMessageService>();
+        context.Services.AddTransient<ITransformEtoHelper, TransformEtoHelper>();
         var chainId = configuration.GetSection("MessageQueue:ChainId").Value;
         Configure<AbpDistributedCacheOptions>(options =>
         {
