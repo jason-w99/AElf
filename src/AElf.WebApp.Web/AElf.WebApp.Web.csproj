@@ -11,6 +11,8 @@
     <ItemGroup>
         <ProjectReference Include="..\AElf.WebApp.Application.Chain\AElf.WebApp.Application.Chain.csproj" />
         <ProjectReference Include="..\AElf.WebApp.Application.Net\AElf.WebApp.Application.Net.csproj" />
+        <ProjectReference Include="..\AElf.WebApp.MessageQueue.RabbitMQ\AElf.WebApp.MessageQueue.RabbitMQ.csproj" />
+        <ProjectReference Include="..\AElf.WebApp.MessageQueue\AElf.WebApp.MessageQueue.csproj" />
     </ItemGroup>
 
     <ItemGroup>
