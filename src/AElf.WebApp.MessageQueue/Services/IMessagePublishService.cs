@@ -252,10 +252,11 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
             var k = 0;
             while (true)
             {
-                if (k==5)
+                if (k == _messageQueueOptions.RetryTimes)
                 {
                     break;
                 }
+
                 try
                 {
                     await _distributedEventBus.PublishAsync(blockChainDataEto);
@@ -264,17 +265,18 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 catch (Exception ex)
                 {
                     _logger.LogError(ex,$"Failed to publish events to mq service.\n {ex.Message}__________"+message.Height+"retry count:"+k+1 );
-                    Thread.Sleep(1000);
+                    Thread.Sleep(_messageQueueOptions.RetryInterval);
                     k += 1;
                 }
             }
 
 
 
-            if (k==4)
+            if (k == (_messageQueueOptions.RetryTimes - 1))
             {
                 return false;
             }
+
             await _syncBlockStateProvider.UpdateBlocksHashAsync(blockSyncState.SentBlockHashs);
             _logger.LogInformation($"{runningPattern} End publish block: {message.Height}.");
             return true;
