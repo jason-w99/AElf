@@ -264,8 +264,8 @@ public class MessagePublishService : IMessagePublishService, ITransientDependenc
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex,$"Failed to publish events to mq service.\n {ex.Message}__________"+message.Height+"retry count:"+k+1 );
-                    Thread.Sleep(_messageQueueOptions.RetryInterval);
+                    _logger.LogError(ex,$"Failed to publish events to mq service.\n {ex.Message}__________"+message.Height+"retry count:"+(k+1) );
+                    await Task.Delay(_messageQueueOptions.RetryInterval);
                     k += 1;
                 }
             }
