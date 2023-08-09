@@ -46,6 +46,7 @@ public class TransformEtoHelper : ITransformEtoHelper
             : block.Header.Bloom.ToBase64());
         blockExtraProperties.Add("ExtraData",block.Header.ExtraData.ToString());
         blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
+        blockExtraProperties.Add("MerkleTreeRootOfTransactionStatus",block.Header.MerkleTreeRootOfTransactionStatus.ToHex());
         blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
         blockExtraProperties.Add("BlockSize",block.CalculateSize().ToString());
 
