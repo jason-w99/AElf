@@ -5,6 +5,7 @@ using AElf.WebApp.MessageQueue.Enum;
 using AElf.WebApp.MessageQueue.Provider;
 using AElf.WebApp.MessageQueue.Services;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.EventBus;
 
@@ -34,6 +35,13 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
     public async Task HandleEventAsync(BlockAcceptedEvent eventData)
     {
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
+        /*if (blockSyncState.SentBlockHashs.Count>0)
+        {
+            foreach (var preBlock in blockSyncState.SentBlockHashs)
+            {
+                _logger.LogDebug($"BlockAcceptedEventHandler HandleEventAsync  blocksHash.Key: { preBlock.Key} | blocksHash.value is {JsonConvert.SerializeObject(preBlock.Value)}");
+            }
+        }*/
         switch (blockSyncState.State)
         {
             case SyncState.Stopped:
@@ -56,7 +64,7 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
         }
 
         _latestHeightProvider.SetLatestHeight(eventData.Block.Height);
-    }
+        }
 
     private async Task StopAsync()
     {
@@ -76,7 +84,7 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
     {
         await _sendMessageByDesignateHeightTaskManager.StopAsync();
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        if (blockSyncState.CurrentHeight + 1 == eventData.Block.Height)
+        if (blockSyncState.CurrentHeight >= eventData.Block.Height)
         {
             _logger.LogInformation("Publish message synchronously");
             await _blockMessageService.SendMessageAsync(eventData.BlockExecutedSet);
@@ -89,20 +97,21 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
             _logger.LogInformation("Start to publish message asynchronously");
             await _sendMessageByDesignateHeightTaskManager.StartAsync();
         }
+       
     }
 
-    private async Task AsyncPreparedToRun(BlockAcceptedEvent eventData)
+    private  async Task AsyncPreparedToRun(BlockAcceptedEvent eventData)
     {
         await _sendMessageByDesignateHeightTaskManager.StopAsync();
         var currentHeight = eventData.Block.Height;
         var blockSyncState = await _syncBlockStateProvider.GetCurrentStateAsync();
-        if (blockSyncState.CurrentHeight >= currentHeight)
+        if (blockSyncState.CurrentHeight+1 >= currentHeight)
         {
             return;
         }
 
-        var from = blockSyncState.CurrentHeight;
-        var to = currentHeight - 2;
+        var from = blockSyncState.CurrentHeight+1;
+        var to = currentHeight - 1;
         if (from > to + 1 || to - from > 10)
         {
             await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.Prepared);
@@ -112,7 +121,7 @@ public class BlockAcceptedEventHandler : ILocalEventHandler<BlockAcceptedEvent>,
         await _syncBlockStateProvider.UpdateStateAsync(null, SyncState.SyncRunning);
         if (from <= to)
         {
-            _logger.LogInformation($"Catch up to current block, from: {from + 1} - to: {to + 1}");
+            _logger.LogInformation($"Catch up to current block, from: {from } - to: {to }");
         }
 
         for (var i = from; i <= to; i++)

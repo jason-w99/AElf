@@ -2,19 +2,24 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf.Contracts.Configuration;
 using AElf.Contracts.Consensus.AEDPoS;
 using AElf.Contracts.MultiToken;
 using AElf.Contracts.Parliament;
 using AElf.ContractTestKit;
 using AElf.Cryptography.ECDSA;
 using AElf.CSharp.Core.Extension;
+using AElf.Kernel.Blockchain.Application;
+using AElf.Kernel.Configuration;
 using AElf.Kernel.Proposal;
+using AElf.Kernel.SmartContract.Application;
 using AElf.Kernel.Token;
 using AElf.Standards.ACS1;
 using AElf.Standards.ACS3;
 using AElf.Types;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Volo.Abp.Threading;
 
@@ -22,6 +27,205 @@ namespace AElf.Kernel.SmartContract.ExecutionPluginForMethodFee.Tests;
 
 public class ExecutionPluginForMethodFeeTestBase : ContractTestBase<ExecutionPluginForMethodFeeTestModule>
 {
+    internal Address ParliamentAddress;
+    internal ParliamentContractImplContainer.ParliamentContractImplStub ParliamentContractStub;
+    protected ECKeyPair DefaultSenderKeyPair => Accounts[0].KeyPair;
+    protected Address DefaultAddress => Accounts[0].Address;
+    
+    protected ExecutionPluginForMethodFeeTestBase()
+    {
+        AsyncHelper.RunSync(InitializeContracts);
+    }
+    
+    private async Task InitializeContracts()
+    {
+        await DeployContractsAsync();
+        await InitializedParliament();
+    }
+
+    private async Task DeployContractsAsync()
+    {
+        const int category = KernelConstants.CodeCoverageRunnerCategory;
+        // Parliament
+        {
+            var code = Codes.Single(kv => kv.Key.Contains("MockParliament")).Value;
+            ParliamentAddress = await DeploySystemSmartContract(category, code,
+                ParliamentSmartContractAddressNameProvider.Name, DefaultSenderKeyPair);
+            ParliamentContractStub =
+                GetTester<ParliamentContractImplContainer.ParliamentContractImplStub>(ParliamentAddress,
+                    DefaultSenderKeyPair);
+        }
+    }
+    
+    private async Task InitializedParliament()
+    {
+        await ParliamentContractStub.Initialize.SendAsync(new InitializeInput
+        {
+            ProposerAuthorityRequired = false,
+            PrivilegedProposer = DefaultAddress
+        });
+    }
+}
+
+public class ExecutionPluginForUserContractMethodFeeTestBase : ContractTestBase<ExecutionPluginForUserContractMethodFeeTestModule>
+{
+    protected const string NativeTokenSymbol = "ELF";
+
+    internal Address ConfigurationAddress;
+    internal Address ParliamentAddress;
+    internal Address ConsensusContractAddress;
+    internal Address TokenContractAddress;
+    internal ParliamentContractImplContainer.ParliamentContractImplStub ParliamentContractStub;
+    internal AuthorizationContractContainer.AuthorizationContractStub AuthorizationContractStub;
+    internal ConfigurationContainer.ConfigurationStub ConfigurationStub;
+    internal TokenContractContainer.TokenContractStub TokenContractStub { get; set; }
+    internal AEDPoSContractContainer.AEDPoSContractStub AEDPoSContractStub { get; set; }
+    protected new ISmartContractAddressService ContractAddressService =>
+        Application.ServiceProvider.GetRequiredService<ISmartContractAddressService>();
+
+    protected IBlockchainService BlockChainService =>
+        Application.ServiceProvider.GetRequiredService<IBlockchainService>();
+
+    protected ECKeyPair DefaultSenderKeyPair => Accounts[0].KeyPair;
+    protected Address DefaultAddress => Accounts[0].Address;
+
+    protected List<ECKeyPair> InitialCoreDataCenterKeyPairs =>
+        Accounts.Take(1).Select(a => a.KeyPair).ToList();
+
+    protected ExecutionPluginForUserContractMethodFeeTestBase()
+    {
+        AsyncHelper.RunSync(InitializeContracts);
+    }
+
+    private async Task InitializeContracts()
+    {
+        await DeployContractsAsync();
+        AuthorizationContractStub =
+            GetTester<AuthorizationContractContainer.AuthorizationContractStub>(ParliamentAddress,
+                DefaultSenderKeyPair);
+        await InitializeAElfConsensus();
+        await InitializedParliament();
+        TokenContractStub = await GetTokenContractStubAsync();
+        await SetPrimaryTokenSymbolAsync();
+    }
+
+    private async Task<Address> GetTokenContractAddressAsync()
+    {
+        var preBlockHeader = await BlockChainService.GetBestChainLastBlockHeaderAsync();
+        var chainContext = new ChainContext
+        {
+            BlockHash = preBlockHeader.GetHash(),
+            BlockHeight = preBlockHeader.Height
+        };
+        var contractMapping =
+            await ContractAddressService.GetSystemContractNameToAddressMappingAsync(chainContext);
+
+        return contractMapping[TokenSmartContractAddressNameProvider.Name];
+    }
+
+    private async Task<TokenContractContainer.TokenContractStub> GetTokenContractStubAsync()
+    {
+        TokenContractAddress = await GetTokenContractAddressAsync();
+        var tokenStub = GetTester<TokenContractContainer.TokenContractStub>(
+            TokenContractAddress, DefaultSenderKeyPair);
+
+        return tokenStub;
+    }
+
+    private async Task InitializedParliament()
+    {
+        await ParliamentContractStub.Initialize.SendAsync(new InitializeInput
+        {
+            ProposerAuthorityRequired = false,
+            PrivilegedProposer = DefaultAddress
+        });
+    }
+
+    private async Task DeployContractsAsync()
+    {
+        const int category = KernelConstants.CodeCoverageRunnerCategory;
+        // Configuration
+        {
+            var code = Codes.Single(kv => kv.Key.Contains("Configuration")).Value;
+            ConfigurationAddress = await DeploySystemSmartContract(category, code,
+                ConfigurationSmartContractAddressNameProvider.Name, DefaultSenderKeyPair);
+            ConfigurationStub =
+                GetTester<ConfigurationContainer.ConfigurationStub>(ConfigurationAddress,
+                    DefaultSenderKeyPair);
+        }
+        // Parliament
+        {
+            var code = Codes.Single(kv => kv.Key.Contains("MockParliament")).Value;
+            ParliamentAddress = await DeploySystemSmartContract(category, code,
+                ParliamentSmartContractAddressNameProvider.Name, DefaultSenderKeyPair);
+            ParliamentContractStub =
+                GetTester<ParliamentContractImplContainer.ParliamentContractImplStub>(ParliamentAddress,
+                    DefaultSenderKeyPair);
+        }
+        //Consensus
+        {
+            var code = Codes.Single(kv => kv.Key.Contains("AEDPoS")).Value;
+            ConsensusContractAddress = await DeploySystemSmartContract(category, code,
+                HashHelper.ComputeFrom("AElf.ContractNames.Consensus"), DefaultSenderKeyPair);
+            AEDPoSContractStub =
+                GetTester<AEDPoSContractContainer.AEDPoSContractStub>(ConsensusContractAddress,
+                    DefaultSenderKeyPair);
+        }
+    }
+
+    private async Task InitializeAElfConsensus()
+    {
+        {
+            await AEDPoSContractStub.InitialAElfConsensusContract.SendAsync(
+                new InitialAElfConsensusContractInput
+                {
+                    PeriodSeconds = 604800L,
+                    MinerIncreaseInterval = 31536000
+                });
+        }
+        {
+            await AEDPoSContractStub.FirstRound.SendAsync(
+                GenerateFirstRoundOfNewTerm(
+                    new MinerList
+                        { Pubkeys = { InitialCoreDataCenterKeyPairs.Select(p => ByteString.CopyFrom(p.PublicKey)) } },
+                    4000, TimestampHelper.GetUtcNow()));
+        }
+    }
+
+    private Round GenerateFirstRoundOfNewTerm(MinerList minerList, int miningInterval,
+        Timestamp currentBlockTime, long currentRoundNumber = 0, long currentTermNumber = 0)
+    {
+        var sortedMiners = minerList.Pubkeys.Select(x => x.ToHex()).ToList();
+        var round = new Round();
+
+        for (var i = 0; i < sortedMiners.Count; i++)
+        {
+            var minerInRound = new MinerInRound();
+
+            // The third miner will be the extra block producer of first round of each term.
+            if (i == 0) minerInRound.IsExtraBlockProducer = true;
+
+            minerInRound.Pubkey = sortedMiners[i];
+            minerInRound.Order = i + 1;
+            minerInRound.ExpectedMiningTime = currentBlockTime.AddMilliseconds(i * miningInterval + miningInterval);
+            // Should be careful during validation.
+            minerInRound.PreviousInValue = Hash.Empty;
+            round.RealTimeMinersInformation.Add(sortedMiners[i], minerInRound);
+        }
+
+        round.RoundNumber = currentRoundNumber + 1;
+        round.TermNumber = currentTermNumber + 1;
+        round.IsMinerListJustChanged = true;
+        round.ExtraBlockProducerOfPreviousRound = sortedMiners[0];
+
+        return round;
+    }
+
+    private async Task SetPrimaryTokenSymbolAsync()
+    {
+        await TokenContractStub.SetPrimaryTokenSymbol.SendAsync(new SetPrimaryTokenSymbolInput
+            { Symbol = "ELF" });
+    }
 }
 
 public class ExecutionPluginForMethodFeeWithForkTestBase : Contracts.TestBase.ContractTestBase<
@@ -120,9 +324,15 @@ public class ExecutePluginTransactionDirectlyForMethodFeeTestBase : ContractTest
     ExecutionPluginTransactionDirectlyForMethodFeeTestModule>
 {
     protected const string NativeTokenSymbol = "ELF";
+    protected const string USDT = "USDT";
+    protected const string Token1 = "TOKENA";
+    protected const string Token2 = "TOKENB";
+
+    protected readonly IBlockTimeProvider BlockTimeProvider;
 
     protected ExecutePluginTransactionDirectlyForMethodFeeTestBase()
     {
+        BlockTimeProvider = GetRequiredService<IBlockTimeProvider>();
         AsyncHelper.RunSync(InitializeContracts);
     }
 
@@ -130,29 +340,75 @@ public class ExecutePluginTransactionDirectlyForMethodFeeTestBase : ContractTest
     internal Address TreasuryContractAddress { get; set; }
     internal Address ConsensusContractAddress { get; set; }
     internal TokenContractContainer.TokenContractStub TokenContractStub { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractImplStub { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractImplStub2 { get; set; }
     internal TokenContractContainer.TokenContractStub TokenContractStub2 { get; set; }
     internal TokenContractContainer.TokenContractStub TokenContractStub3 { get; set; }
+    internal TokenContractContainer.TokenContractStub TokenContractStubDelegator { get; set; }
+
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubDelegate1 { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubDelegate2 { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubDelegate3 { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubSecondaryDelegate1 { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubSecondaryDelegate2 { get; set; }
+
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubSecondaryDelegate3 { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubSecondaryDelegate4 { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubSecondaryDelegate5 { get; set; }
+    internal TokenContractImplContainer.TokenContractImplStub TokenContractStubSecondaryDelegate6 { get; set; }
+    
     internal ParliamentContractImplContainer.ParliamentContractImplStub ParliamentContractStub { get; set; }
     internal AEDPoSContractContainer.AEDPoSContractStub AEDPoSContractStub { get; set; }
     internal ECKeyPair DefaultSenderKeyPair => Accounts[0].KeyPair;
     internal ECKeyPair DelegateeKeyPair => Accounts[1].KeyPair;
+    internal ECKeyPair Delegatee2KeyPair => Accounts[3].KeyPair;
+    internal ECKeyPair Delegatee3KeyPair => Accounts[5].KeyPair;
+    internal ECKeyPair SecondaryDelegatee1KeyPair => Accounts[6].KeyPair;
+    internal ECKeyPair SecondaryDelegatee2KeyPair => Accounts[7].KeyPair;
+
+    internal ECKeyPair SecondaryDelegatee3KeyPair => Accounts[8].KeyPair;
+
+    internal ECKeyPair SecondaryDelegatee4KeyPair => Accounts[9].KeyPair;
+
+    internal ECKeyPair SecondaryDelegatee5KeyPair => Accounts[11].KeyPair;
+
+    internal ECKeyPair SecondaryDelegatee6KeyPair => Accounts[12].KeyPair;
+
+
     internal ECKeyPair UserKeyPair => Accounts[2].KeyPair;
     internal ECKeyPair UserAKeyPair => Accounts[3].KeyPair;
 
     internal ECKeyPair UserTomSenderKeyPair => Accounts[10].KeyPair;
     internal Address UserTomSender => Accounts[10].Address;
+
     protected List<ECKeyPair> InitialCoreDataCenterKeyPairs =>
         Accounts.Take(1).Select(a => a.KeyPair).ToList();
 
     internal Address DefaultSender => Accounts[0].Address;
-    internal Address delegateeAddress => Accounts[1].Address;
+    internal Address DelegateeAddress => Accounts[1].Address;
+    internal Address Delegatee2Address => Accounts[3].Address;
+    internal Address Delegatee3Address => Accounts[5].Address;
+    internal Address SecondaryDelegatee1Address => Accounts[6].Address;
+    internal Address SecondaryDelegatee2Address => Accounts[7].Address;
+
+    internal Address SecondaryDelegatee3Address => Accounts[8].Address;
+
+    internal Address SecondaryDelegatee4Address => Accounts[9].Address;
+
+    internal Address SecondaryDelegatee5Address => Accounts[11].Address;
+
+    internal Address SecondaryDelegatee6Address => Accounts[12].Address;
+
+
+
     internal Address userAddress => Accounts[2].Address;
 
     internal TokenContractContainer.TokenContractStub TokenContractStubA { get; set; }
     internal Address UserAAddress => Accounts[3].Address;
-    internal Address UserCAddress => Accounts[4].Address;
+    internal Address UserBAddress => Accounts[4].Address;
+    internal Address UserCAddress => Accounts[5].Address;
 
- 
+
     private async Task InitializeContracts()
     {
         await DeployContractsAsync();
@@ -182,15 +438,42 @@ public class ExecutePluginTransactionDirectlyForMethodFeeTestBase : ContractTest
                 GetTester<TokenContractContainer.TokenContractStub>(TokenContractAddress, DefaultSenderKeyPair);
             TokenContractStub2 =
                 GetTester<TokenContractContainer.TokenContractStub>(TokenContractAddress, DelegateeKeyPair);
-            TokenContractStub3 = 
+            TokenContractStub3 =
                 GetTester<TokenContractContainer.TokenContractStub>(TokenContractAddress, UserKeyPair);
-            TokenContractStubA = 
+            TokenContractStubA =
                 GetTester<TokenContractContainer.TokenContractStub>(TokenContractAddress, UserKeyPair);
+            TokenContractStubDelegator =
+                GetTester<TokenContractContainer.TokenContractStub>(TokenContractAddress, UserTomSenderKeyPair);
+            TokenContractStubDelegate1 =
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, DelegateeKeyPair);
+            TokenContractStubDelegate2 = 
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, Delegatee2KeyPair);
+            TokenContractImplStub =
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, DefaultSenderKeyPair);
+            TokenContractStubDelegate3 = 
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, Delegatee3KeyPair);
+            TokenContractStubSecondaryDelegate1 = 
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, SecondaryDelegatee1KeyPair);
+            TokenContractStubSecondaryDelegate2 = 
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, SecondaryDelegatee2KeyPair);
+            TokenContractStubSecondaryDelegate3 = 
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, SecondaryDelegatee3KeyPair);
+            TokenContractStubSecondaryDelegate4 = 
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, SecondaryDelegatee4KeyPair);
+            TokenContractStubSecondaryDelegate5 = 
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, SecondaryDelegatee5KeyPair);
+            TokenContractStubSecondaryDelegate6 = 
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, SecondaryDelegatee6KeyPair);
+            
+            TokenContractImplStub =
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, DefaultSenderKeyPair);
+            TokenContractImplStub2 =
+                GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, UserKeyPair);
         }
 
         // Parliament
         {
-            var code = Codes.Single(kv => kv.Key.Contains("Parliament")).Value;
+            var code = Codes.Single(kv => kv.Key.Contains("MockParliament")).Value;
             var parliamentContractAddress = await DeploySystemSmartContract(category, code,
                 ParliamentSmartContractAddressNameProvider.Name, DefaultSenderKeyPair);
             ParliamentContractStub =
@@ -227,7 +510,8 @@ public class ExecutePluginTransactionDirectlyForMethodFeeTestBase : ContractTest
             IsBurnable = true,
             TokenName = "elf token",
             TotalSupply = totalSupply,
-            Issuer = DefaultSender
+            Issuer = DefaultSender,
+            Owner = DefaultSender
         });
         createResult.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
     }

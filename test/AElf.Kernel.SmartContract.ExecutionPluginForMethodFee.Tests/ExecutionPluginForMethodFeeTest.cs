@@ -43,9 +43,9 @@ public sealed class ExecutionPluginForMethodFeeTest : ExecutionPluginForMethodFe
     private async Task DeployTestContractAsync()
     {
         var category = KernelConstants.CodeCoverageRunnerCategory;
-        var code = Codes.Single(kv => kv.Key.Contains("TestContract")).Value;
+        var code = Codes.Single(kv => kv.Key.Contains("ExecutionPluginForMethodFee.Tests.TestContract")).Value;
         _testContractAddress = await DeploySystemSmartContract(category, code,
-            HashHelper.ComputeFrom("TestContract"),
+            HashHelper.ComputeFrom("ExecutionPluginForMethodFee.Tests.TestContract"),
             DefaultSenderKeyPair);
         _testContractStub =
             GetTester<ContractContainer.ContractStub>(_testContractAddress, DefaultSenderKeyPair);
@@ -61,7 +61,8 @@ public sealed class ExecutionPluginForMethodFeeTest : ExecutionPluginForMethodFe
             IsBurnable = true,
             TokenName = "test token",
             TotalSupply = 1_000_000_00000000L,
-            Issuer = DefaultSender
+            Issuer = DefaultSender,
+            Owner = DefaultSender
         });
 
         if (issueAmount != 0)
@@ -123,6 +124,7 @@ public sealed class ExecutionPluginForMethodFeeTest : ExecutionPluginForMethodFe
         transactions[0].From.ShouldBe(DefaultSender);
         transactions[0].To.ShouldBe(await GetTokenContractAddressAsync());
     }
+    
 
     private I GetCreateInstance<I, T>() where T : I
     {
@@ -262,6 +264,8 @@ public sealed class ExecutionPluginForMethodFeeTest : ExecutionPluginForMethodFe
 
         var dummy = await _testContractStub.DummyMethod.SendAsync(new Empty()); // This will deduct the fee
         dummy.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
+        var chargingAddress = GetChargingAddress(dummy.TransactionResult);
+        chargingAddress.ShouldContain(dummy.Transaction.From);
 
         var transactionFeeDic = dummy.TransactionResult.GetChargedTransactionFees();
         await CheckTransactionFeesMapAsync(transactionFeeDic);
@@ -272,6 +276,12 @@ public sealed class ExecutionPluginForMethodFeeTest : ExecutionPluginForMethodFe
             Symbol = "ELF"
         });
         after.Balance.ShouldBe(before.Balance - transactionFeeDic[before.Symbol]);
+    }
+    
+    private static List<Address> GetChargingAddress(TransactionResult transactionResult)
+    {
+        var relatedLogs = transactionResult.Logs.Where(l => l.Name == nameof(TransactionFeeCharged)).ToList();
+        return relatedLogs.Select(l => TransactionFeeCharged.Parser.ParseFrom(l.Indexed[0]).ChargingAddress).ToList();
     }
 
     private async Task CheckTransactionFeesMapAsync(Dictionary<string, long> transactionFeeDic)
@@ -330,7 +340,7 @@ public sealed class ExecutionPluginForMethodFeeTest : ExecutionPluginForMethodFe
     [InlineData(9, 0, 1, 10, 1, 2, "ELF", 9, false)]
     [InlineData(100000000, 2, 2, 0, 1, 2, "TSA", 1, true)]
     [InlineData(100000000, 2, 2, 0, 13, 2, "TSB", 2, true)]
-    [InlineData(100000000, 2, 2, 0, 20, 20, "TSB", 2, false)]
+    [InlineData(100000000, 2, 2, 0, 20, 20, "TSA", 2, false)]
     [InlineData(1, 0, 1, 0, 1, 2, "TSB", 1, false)]
     [InlineData(10, 0, 0, 0, 1, 2, "ELF", 10, false)] // Charge 10 ELFs tx size fee.
     public async Task ChargeFee_Set_Method_Fees_Tests(long balance1, long balance2, long balance3, long fee1, long fee2,

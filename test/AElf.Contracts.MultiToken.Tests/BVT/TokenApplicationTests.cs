@@ -5,6 +5,7 @@ using AElf.Contracts.Consensus.DPoS;
 using AElf.Contracts.TestContract.BasicFunction;
 using AElf.CSharp.Core;
 using AElf.CSharp.Core.Extension;
+using AElf.Kernel;
 using AElf.Standards.ACS10;
 using AElf.Types;
 using Google.Protobuf.WellKnownTypes;
@@ -15,6 +16,7 @@ namespace AElf.Contracts.MultiToken;
 
 public partial class MultiTokenContractTests
 {
+    protected const string SymbolForTest = "GHJ";
     [Fact(DisplayName = "[MultiToken] Transfer token test")]
     public async Task MultiTokenContract_Transfer_Test()
     {
@@ -372,12 +374,13 @@ public partial class MultiTokenContractTests
                 OtherBasicFunctionContractAddress,
                 TreasuryContractAddress
             };
-        await TokenContractStub.Create.SendAsync(new CreateInput
+        await CreateMutiTokenAsync(TokenContractStub,new CreateInput
         {
             Symbol = SymbolForTest,
             Decimals = 2,
             IsBurnable = true,
             Issuer = DefaultAddress,
+            Owner = DefaultAddress,
             TokenName = "elf test token",
             TotalSupply = DPoSContractConsts.LockTokenForElection * 1000000,
             LockWhiteList =
@@ -811,14 +814,15 @@ public partial class MultiTokenContractTests
     {
         await CreateAndIssueMultiTokensAsync();
         var unburnedTokenSymbol = "UNBURNED";
-        await TokenContractStub.Create.SendAsync(new CreateInput
+        await CreateMutiTokenAsync(TokenContractStub, new CreateInput
         {
             Symbol = unburnedTokenSymbol,
             TokenName = "Name",
             TotalSupply = 100_000_000_000L,
             Decimals = 10,
             IsBurnable = false,
-            Issuer = DefaultAddress
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress,
         });
         var burnRet = await TokenContractStub.Burn.SendWithExceptionAsync(new BurnInput
         {
@@ -940,69 +944,6 @@ public partial class MultiTokenContractTests
         afterBalance.Balance.ShouldBe(beforeBalance.Balance.Add(transferAmount));
     }
 
-    [Fact(DisplayName = "[MultiToken] ChangeTokenIssuer test")]
-    public async Task ChangeTokenIssuer_Test()
-    {
-        const string tokenSymbol = "PO";
-        await CreateAndIssueMultiTokensAsync();
-        await TokenContractStub.Create.SendAsync(new CreateInput
-        {
-            Symbol = tokenSymbol,
-            TokenName = "Name",
-            TotalSupply = 100_000_000_000L,
-            Decimals = 10,
-            IsBurnable = true,
-            Issuer = Accounts[1].Address
-        });
-        var tokenIssuerStub =
-            GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, Accounts[1].KeyPair);
-
-        {
-            var issueNotExistTokenRet = await tokenIssuerStub.ChangeTokenIssuer.SendWithExceptionAsync(
-                new ChangeTokenIssuerInput
-                {
-                    Symbol = "NOTEXIST",
-                    NewTokenIssuer = Accounts[2].Address
-                });
-            issueNotExistTokenRet.TransactionResult.Error.ShouldContain("invalid token symbol");
-        }
-        {
-            await tokenIssuerStub.ChangeTokenIssuer.SendAsync(new ChangeTokenIssuerInput
-            {
-                Symbol = tokenSymbol,
-                NewTokenIssuer = Accounts[2].Address
-            });
-            var tokenInfo = await tokenIssuerStub.GetTokenInfo.CallAsync(new GetTokenInfoInput
-            {
-                Symbol = tokenSymbol
-            });
-            tokenInfo.Issuer.ShouldBe(Accounts[2].Address);
-        }
-    }
-
-    [Fact(DisplayName = "[MultiToken] sender is not the token issuer")]
-    public async Task ChangeTokenIssuer_Without_Authorization_Test()
-    {
-        const string tokenSymbol = "PO";
-        await CreateAndIssueMultiTokensAsync();
-        await TokenContractStub.Create.SendAsync(new CreateInput
-        {
-            Symbol = tokenSymbol,
-            TokenName = "Name",
-            TotalSupply = 100_000_000_000L,
-            Decimals = 10,
-            IsBurnable = true,
-            Issuer = Accounts[1].Address
-        });
-        var changeIssuerRet = await TokenContractStub.ChangeTokenIssuer.SendWithExceptionAsync(
-            new ChangeTokenIssuerInput
-            {
-                Symbol = tokenSymbol,
-                NewTokenIssuer = Accounts[2].Address
-            });
-        changeIssuerRet.TransactionResult.Error.ShouldContain("permission denied");
-    }
-
     [Fact(DisplayName = "[MultiToken] Token initialize from parent chain test")]
     public async Task InitializeFromParent_Test()
     {
@@ -1064,7 +1005,8 @@ public partial class MultiTokenContractTests
             TokenName = "Ali",
             Decimals = 4,
             TotalSupply = 100_000,
-            Issuer = DefaultAddress
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress
         });
         createTokenRet.TransactionResult.Error.ShouldContain(
             "Failed to create token if side chain creator already set.");
@@ -1078,7 +1020,6 @@ public partial class MultiTokenContractTests
     public async Task CheckThreshold_With_One_Token_Test(long totalSupply, long issueAmount, long ApproveAmount,
         long checkAmount, bool isCheckAllowance, bool isThrowException)
     {
-        await CreateNativeTokenAsync();
         var tokenA = "AITA";
         await CreateAndIssueCustomizeTokenAsync(DefaultAddress, tokenA, totalSupply, issueAmount);
         if (ApproveAmount > 0)
@@ -1122,7 +1063,6 @@ public partial class MultiTokenContractTests
     public async Task CheckThreshold_With_Multiple_Token_Test(long tokenACheckAmount, long tokenAApporveAmount,
         long tokenBCheckAmount, long tokenBApporveAmount, bool isCheckAllowance, bool isThrowException)
     {
-        await CreateNativeTokenAsync();
         var tokenA = "AITA";
         await CreateAndIssueCustomizeTokenAsync(DefaultAddress, tokenA, 10000, 1000);
         var tokenB = "AITB";
@@ -1170,10 +1110,11 @@ public partial class MultiTokenContractTests
         long issueAmount,
         Address to = null, params string[] otherParameters)
     {
-        await TokenContractStub.Create.SendAsync(new CreateInput
+        await CreateMutiTokenAsync(TokenContractStub,new CreateInput
         {
             Symbol = symbol,
             Issuer = creator,
+            Owner = creator,
             TokenName = symbol + "name",
             TotalSupply = totalSupply,
             Decimals = 4
@@ -1184,5 +1125,106 @@ public partial class MultiTokenContractTests
             Amount = issueAmount,
             To = to == null ? creator : to
         });
+    }
+
+    [Fact]
+    public async Task ValidateTokenInfoExists_ExternalInfo_Test()
+    {
+        await CreateMutiTokenAsync(TokenContractStub, new CreateInput
+        {
+            Symbol = AliceCoinTokenInfo.Symbol,
+            TokenName = AliceCoinTokenInfo.TokenName,
+            TotalSupply = AliceCoinTokenInfo.TotalSupply,
+            Decimals = AliceCoinTokenInfo.Decimals,
+            Issuer = AliceCoinTokenInfo.Issuer,
+            Owner = AliceCoinTokenInfo.Issuer,
+            IsBurnable = AliceCoinTokenInfo.IsBurnable,
+            LockWhiteList =
+            {
+                BasicFunctionContractAddress,
+                OtherBasicFunctionContractAddress,
+                TokenConverterContractAddress,
+                TreasuryContractAddress
+            }
+        });
+
+        var result = await TokenContractStub.ValidateTokenInfoExists.SendAsync(
+            new ValidateTokenInfoExistsInput
+            {
+                Symbol = AliceCoinTokenInfo.Symbol,
+                TokenName = AliceCoinTokenInfo.TokenName,
+                TotalSupply = AliceCoinTokenInfo.TotalSupply,
+                Decimals = AliceCoinTokenInfo.Decimals,
+                Issuer = AliceCoinTokenInfo.Issuer,
+                Owner = AliceCoinTokenInfo.Issuer,
+                IsBurnable = AliceCoinTokenInfo.IsBurnable,
+                IssueChainId = _chainId
+            });
+
+        result.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
+
+        result = await TokenContractStub.ValidateTokenInfoExists.SendWithExceptionAsync(
+            new ValidateTokenInfoExistsInput
+            {
+                Symbol = AliceCoinTokenInfo.Symbol,
+                TokenName = AliceCoinTokenInfo.TokenName,
+                TotalSupply = AliceCoinTokenInfo.TotalSupply,
+                Decimals = AliceCoinTokenInfo.Decimals,
+                Issuer = AliceCoinTokenInfo.Issuer,
+                Owner = AliceCoinTokenInfo.Issuer,
+                IsBurnable = AliceCoinTokenInfo.IsBurnable,
+                ExternalInfo = { { "key", "value" } }
+            });
+
+        result.TransactionResult.Status.ShouldBe(TransactionResultStatus.Failed);
+    }
+
+    [Fact]
+    public async Task CrossContractCreateToken_Test()
+    {
+        var fee = await TokenContractStub.GetMethodFee.CallAsync(new StringValue { Value = "Create" });
+        var createTokenInput = new CreateTokenThroughMultiTokenInput
+        {
+            Symbol = "TEST",
+            Decimals = 8,
+            TokenName = "TEST token",
+            Issuer = DefaultAddress,
+            IsBurnable = true,
+            TotalSupply = TotalSupply,
+            ExternalInfo = new TestContract.BasicFunction.ExternalInfo()
+        };
+        var input = new CreateInput
+        {
+            Symbol = SeedNFTSymbolPre + 100,
+            Decimals = 0,
+            IsBurnable = true,
+            TokenName = "seed token" + 100,
+            TotalSupply = 1,
+            Issuer = DefaultAddress,
+            ExternalInfo = new ExternalInfo(),
+            LockWhiteList = { TokenContractAddress },
+            Owner = DefaultAddress
+        };
+        input.ExternalInfo.Value["__seed_owned_symbol"] = createTokenInput.Symbol;
+        input.ExternalInfo.Value["__seed_exp_time"] = TimestampHelper.GetUtcNow().AddDays(1).Seconds.ToString();
+        await TokenContractStub.Create.SendAsync(input);
+        await TokenContractStub.Issue.SendAsync(new IssueInput
+        {
+            Symbol = input.Symbol,
+            Amount = 1,
+            Memo = "ddd",
+            To = BasicFunctionContractAddress
+        });
+
+        var result = await BasicFunctionContractStub.CreateTokenThroughMultiToken.SendAsync(createTokenInput);
+        result.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
+        var checkTokenInfo = await TokenContractStub.GetTokenInfo.CallAsync(new GetTokenInfoInput { Symbol = "TEST" });
+        checkTokenInfo.Decimals.ShouldBe(createTokenInput.Decimals);
+        checkTokenInfo.Issuer.ShouldBe(createTokenInput.Issuer);
+        checkTokenInfo.Decimals.ShouldBe(createTokenInput.Decimals);
+        checkTokenInfo.TokenName.ShouldBe(createTokenInput.TokenName);
+        checkTokenInfo.TotalSupply.ShouldBe(createTokenInput.TotalSupply);
+        checkTokenInfo.IsBurnable.ShouldBe(createTokenInput.IsBurnable);
+        checkTokenInfo.ExternalInfo.Value.ShouldBe(createTokenInput.ExternalInfo.Value);
     }
 }
