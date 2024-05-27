@@ -20,4 +20,10 @@
         <ProjectReference Include="..\AElf.WebApp.Application.Core\AElf.WebApp.Application.Core.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <ContractBase Include="..\..\protobuf\transaction_fee.proto">
+            <Link>Protobuf\Proto\transaction_fee.proto</Link>
+        </ContractBase>
+    </ItemGroup>
+
 </Project>
