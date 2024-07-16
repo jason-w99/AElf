@@ -225,6 +225,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AElf.Sdk.CSharp.Tests.TestC
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AElf.Types.Tests", "test\AElf.Types.Tests\AElf.Types.Tests.csproj", "{8F0238CE-105F-4265-A304-308D938DDF54}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AElf.WebApp.MessageQueue", "src\AElf.WebApp.MessageQueue\AElf.WebApp.MessageQueue.csproj", "{6EF98EEB-B1EF-4B28-A095-836B9EC69386}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AElf.WebApp.Application.MessageQueue.Tests", "test\AElf.WebApp.Application.MessageQueue.Tests\AElf.WebApp.Application.MessageQueue.Tests.csproj", "{EB42F874-C19C-450D-8786-5653F8328B33}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -342,6 +346,8 @@ Global
 		{AA1D9D58-E6D0-4E04-86B2-BD5553222B6B} = {B7751FC6-0B5D-4AD1-93FB-77FF50954BC5}
 		{6AE066E9-9CF7-4F4F-A205-32039B3A0AA6} = {B7751FC6-0B5D-4AD1-93FB-77FF50954BC5}
 		{8F0238CE-105F-4265-A304-308D938DDF54} = {B7751FC6-0B5D-4AD1-93FB-77FF50954BC5}
+		{6EF98EEB-B1EF-4B28-A095-836B9EC69386} = {62C7FEA0-5588-4AD7-A0FC-110544EAE285}
+		{EB42F874-C19C-450D-8786-5653F8328B33} = {56AE29B6-6233-4B1F-848B-079B6CC0A3B0}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{D80FD698-7A0E-4DF2-BD0C-624E924A5D4E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -764,5 +770,13 @@ Global
 		{8F0238CE-105F-4265-A304-308D938DDF54}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F0238CE-105F-4265-A304-308D938DDF54}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F0238CE-105F-4265-A304-308D938DDF54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6EF98EEB-B1EF-4B28-A095-836B9EC69386}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6EF98EEB-B1EF-4B28-A095-836B9EC69386}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6EF98EEB-B1EF-4B28-A095-836B9EC69386}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6EF98EEB-B1EF-4B28-A095-836B9EC69386}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EB42F874-C19C-450D-8786-5653F8328B33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EB42F874-C19C-450D-8786-5653F8328B33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EB42F874-C19C-450D-8786-5653F8328B33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EB42F874-C19C-450D-8786-5653F8328B33}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
