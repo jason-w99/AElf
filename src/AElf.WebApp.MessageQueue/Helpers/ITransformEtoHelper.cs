@@ -1,9 +1,7 @@
 using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using AElf.Kernel;
-using AElf.Kernel.FeeCalculation.Extensions;
 using AElf.Types;
+using AElf.WebApp.MessageQueue.Extensions;
 using Google.Protobuf;
 using Newtonsoft.Json;
 
