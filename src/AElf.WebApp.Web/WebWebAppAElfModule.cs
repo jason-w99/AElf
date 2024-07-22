@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using AElf.Modularity;
 using AElf.WebApp.Application.Chain;
 using AElf.WebApp.Application.Net;
+using AElf.WebApp.MessageQueue;
+using AElf.WebApp.MessageQueue.RabbitMQ;
 using Google.Protobuf;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -34,6 +36,7 @@ namespace AElf.WebApp.Web;
 [DependsOn(
     typeof(ChainApplicationWebAppAElfModule),
     typeof(NetApplicationWebAppAElfModule),
+    typeof(MessageQueueRabbitMQAElfModule),
     typeof(AbpCastleCoreModule),
     typeof(WebAppAbpAspNetCoreMvcModule))]
 public class WebWebAppAElfModule : AElfModule
@@ -84,6 +87,9 @@ public class WebWebAppAElfModule : AElfModule
 
             options.ConventionalControllers.Create(typeof(NetApplicationWebAppAElfModule).Assembly,
                 setting => { setting.UrlControllerNameNormalizer = _ => "net"; });
+            
+            options.ConventionalControllers.Create(typeof(MessageQueueAElfModule).Assembly,
+                setting => { setting.UrlControllerNameNormalizer = _ => "blockMessage"; });
         });
     }
 
