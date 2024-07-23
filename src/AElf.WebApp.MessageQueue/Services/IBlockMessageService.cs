@@ -74,7 +74,10 @@ public class BlockMessageService : IBlockMessageService, ITransientDependency
         }
 
         var queryHeightLog = new StringBuilder($"Query height from: {from} to: {to}: ");
-        blockMessageList.ForAll(b => queryHeightLog.Append($"|{b.Height}|"));
+        foreach (var blockEto in blockMessageList)
+        {
+            queryHeightLog.Append($"|{blockEto.Height}|");
+        }
         _logger.LogInformation(queryHeightLog.ToString());
         
         var sortedMessageQuery = blockMessageList.OrderBy(b => b.Height);
