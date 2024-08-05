@@ -5,6 +5,7 @@ using AElf.Contracts.Consensus.DPoS;
 using AElf.Contracts.TestContract.BasicFunction;
 using AElf.CSharp.Core;
 using AElf.CSharp.Core.Extension;
+using AElf.Kernel;
 using AElf.Standards.ACS10;
 using AElf.Types;
 using Google.Protobuf.WellKnownTypes;
@@ -15,6 +16,7 @@ namespace AElf.Contracts.MultiToken;
 
 public partial class MultiTokenContractTests
 {
+    protected const string SymbolForTest = "GHJ";
     [Fact(DisplayName = "[MultiToken] Transfer token test")]
     public async Task MultiTokenContract_Transfer_Test()
     {
@@ -167,6 +169,145 @@ public partial class MultiTokenContractTests
             Symbol = SymbolForTest
         });
         basicAllowanceOutput.Allowance.ShouldBe(2000L);
+    }
+
+    [Fact(DisplayName = "[MultiToken] BatchApprove token to Contract")]
+    public async Task MultiTokenContract_BatchApprove_ContractAddress_Test()
+    {
+        await CreateTokenAndIssue();
+        var approveBasisResult = (await TokenContractStub.BatchApprove.SendAsync(new BatchApproveInput
+        {
+            Value =
+            {
+                new ApproveInput
+                {
+                    Symbol = SymbolForTest,
+                    Amount = 2000L,
+                    Spender = BasicFunctionContractAddress
+                },
+                new ApproveInput
+                {
+                    Symbol = SymbolForTest,
+                    Amount = 1000L,
+                    Spender = OtherBasicFunctionContractAddress
+                },
+                new ApproveInput
+                {
+                    Symbol = SymbolForTest,
+                    Amount = 5000L,
+                    Spender = TreasuryContractAddress
+                }
+            }
+        })).TransactionResult;
+        approveBasisResult.Status.ShouldBe(TransactionResultStatus.Mined);
+
+        var basicAllowanceOutput = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = BasicFunctionContractAddress,
+            Symbol = SymbolForTest
+        });
+        basicAllowanceOutput.Allowance.ShouldBe(2000L);
+        var otherBasicAllowanceOutput = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = OtherBasicFunctionContractAddress,
+            Symbol = SymbolForTest
+        });
+        otherBasicAllowanceOutput.Allowance.ShouldBe(1000L);
+        var treasuryAllowanceOutput = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = TreasuryContractAddress,
+            Symbol = SymbolForTest
+        });
+        treasuryAllowanceOutput.Allowance.ShouldBe(5000L);
+
+        approveBasisResult = (await TokenContractStub.BatchApprove.SendAsync(new BatchApproveInput
+        {
+            Value =
+            {
+                new ApproveInput
+                {
+                    Symbol = SymbolForTest,
+                    Amount = 1000L,
+                    Spender = BasicFunctionContractAddress
+                },
+                new ApproveInput
+                {
+                    Symbol = SymbolForTest,
+                    Amount = 3000L,
+                    Spender = BasicFunctionContractAddress
+                },
+                new ApproveInput
+                {
+                    Symbol = SymbolForTest,
+                    Amount = 3000L,
+                    Spender = TreasuryContractAddress
+                }
+            }
+        })).TransactionResult;
+        approveBasisResult.Status.ShouldBe(TransactionResultStatus.Mined);
+        basicAllowanceOutput = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = BasicFunctionContractAddress,
+            Symbol = SymbolForTest
+        });
+        basicAllowanceOutput.Allowance.ShouldBe(3000L);
+
+        treasuryAllowanceOutput = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = TreasuryContractAddress,
+            Symbol = SymbolForTest
+        });
+        treasuryAllowanceOutput.Allowance.ShouldBe(3000L);
+    }
+
+    [Fact]
+    public async Task MultiTokenContract_SetMaximumBatchApproveCount_Test()
+    {
+        var result = await TokenContractStub.SetMaxBatchApproveCount.SendWithExceptionAsync(new Int32Value
+        {
+            Value = 1
+        });
+        result.TransactionResult.Status.ShouldBe(TransactionResultStatus.Failed);
+        result.TransactionResult.Error.ShouldContain("Unauthorized behavior");
+        var maximumBatchApproveCountOutput = await TokenContractStub.GetMaxBatchApproveCount.CallAsync(new Empty());
+        maximumBatchApproveCountOutput.Value.ShouldBe(100);
+        var defaultParliament = await ParliamentContractStub.GetDefaultOrganizationAddress.CallAsync(new Empty());
+        var proposalId = await CreateProposalAsync(TokenContractAddress,
+            defaultParliament, nameof(TokenContractStub.SetMaxBatchApproveCount),
+            new Int32Value
+            {
+                Value = 1
+            });
+        await ApproveWithMinersAsync(proposalId);
+        await ParliamentContractStub.Release.SendAsync(proposalId);
+        maximumBatchApproveCountOutput = await TokenContractStub.GetMaxBatchApproveCount.CallAsync(new Empty());
+        maximumBatchApproveCountOutput.Value.ShouldBe(1);
+        await CreateTokenAndIssue();
+        var approveBasisResult = (await TokenContractStub.BatchApprove.SendWithExceptionAsync(new BatchApproveInput
+        {
+            Value =
+            {
+                new ApproveInput
+                {
+                    Symbol = SymbolForTest,
+                    Amount = 2000L,
+                    Spender = BasicFunctionContractAddress
+                },
+                new ApproveInput
+                {
+                    Symbol = SymbolForTest,
+                    Amount = 1000L,
+                    Spender = OtherBasicFunctionContractAddress
+                }
+            }
+        })).TransactionResult;
+        approveBasisResult.Status.ShouldBe(TransactionResultStatus.Failed);
+        approveBasisResult.Error.ShouldContain("Exceeds the max batch approve count");
     }
 
     [Fact(DisplayName = "[MultiToken] Approve token out of owner's balance")]
@@ -363,6 +504,452 @@ public partial class MultiTokenContractTests
         afterTransferFromBalance.Balance.ShouldBe(beforeTransferFromBalance.Balance.Sub(transferAmount));
     }
 
+    private async Task CreateNft()
+    {
+        await CreateMutiTokenAsync(TokenContractStub, new CreateInput
+        {
+            TokenName = "Test",
+            TotalSupply = TotalSupply,
+            Decimals = 0,
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress,
+            IssueChainId = _chainId,
+            Symbol = "ABC-0"
+        });
+        await TokenContractStub.Create.SendAsync(new CreateInput
+        {
+            TokenName = "Test",
+            TotalSupply = TotalSupply,
+            Decimals = 0,
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress,
+            IssueChainId = _chainId,
+            Symbol = "ABC-1"
+        });
+    }
+    [Fact]
+    public async Task MultiTokenContract_TransferFrom_Nft_Global_Test()
+    {
+        await CreateNft();
+        await TokenContractStub.Issue.SendAsync(new IssueInput
+        {
+            Symbol = "ABC-1",
+            Amount = 100,
+            To = DefaultAddress,
+            Memo = "test"
+        });
+        await TokenContractStub.Issue.SendAsync(new IssueInput
+        {
+            Symbol = "ABC-1",
+            Amount = 200,
+            To = User1Address,
+            Memo = "test"
+        });
+        var balance = await TokenContractStub.GetBalance.CallAsync(new GetBalanceInput
+        {
+            Owner = DefaultAddress,
+            Symbol = "ABC-1"
+        });
+        balance.Balance.ShouldBe(100);
+        balance = await TokenContractStub.GetBalance.CallAsync(new GetBalanceInput
+        {
+            Owner = User1Address,
+            Symbol = "ABC-1"
+        });
+        balance.Balance.ShouldBe(200);
+        await TokenContractStub.Approve.SendAsync(new ApproveInput
+        {
+            Amount = 1000,
+            Symbol = "*",
+            Spender = User1Address
+        });
+        
+        await TokenContractStub.Approve.SendAsync(new ApproveInput
+        {
+            Amount = 1,
+            Symbol = "ABC-*",
+            Spender = User1Address
+        });
+        var allowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "ABC-1"
+        });
+        allowance.Allowance.ShouldBe(0);
+        allowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "ELF"
+        });
+        allowance.Allowance.ShouldBe(0);
+        {
+            var realAllowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+            {
+                Owner = DefaultAddress,
+                Spender = User1Address,
+                Symbol = "ABC-1"
+            });
+            realAllowance.Allowance.ShouldBe(1000);
+        }
+        {
+            var realAllowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+            {
+                Owner = DefaultAddress,
+                Spender = User1Address,
+                Symbol = "ELF"
+            });
+            realAllowance.Allowance.ShouldBe(1000);
+        }
+        var user1Stub =
+            GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, User1KeyPair);
+        var result2 = await user1Stub.TransferFrom.SendAsync(new TransferFromInput
+        {
+            Amount = 50,
+            From = DefaultAddress,
+            Memo = "test",
+            Symbol = "ABC-1",
+            To = User1Address
+        }); 
+        result2.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
+        {
+            var realAllowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+            {
+                Owner = DefaultAddress,
+                Spender = User1Address,
+                Symbol = "ABC-1"
+            });
+            realAllowance.Allowance.ShouldBe(0);
+        }
+        allowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "ABC-1"
+        });
+        allowance.Allowance.ShouldBe(1000-50);
+        balance = await TokenContractStub.GetBalance.CallAsync(new GetBalanceInput
+        {
+            Owner = DefaultAddress,
+            Symbol = "ABC-1"
+        });
+        balance.Balance.ShouldBe(50);
+        balance = await TokenContractStub.GetBalance.CallAsync(new GetBalanceInput
+        {
+            Owner = User1Address,
+            Symbol = "ABC-1"
+        });
+        balance.Balance.ShouldBe(250);
+    }
+    
+    [Fact]
+    public async Task MultiTokenContract_TransferFrom_Nft_Collection_Test()
+    {
+        await CreateNft();
+        await TokenContractStub.Issue.SendAsync(new IssueInput
+        {
+            Symbol = "ABC-1",
+            Amount = 100,
+            To = DefaultAddress,
+            Memo = "test"
+        });
+        await TokenContractStub.Issue.SendAsync(new IssueInput
+        {
+            Symbol = "ABC-1",
+            Amount = 200,
+            To = User1Address,
+            Memo = "test"
+        });
+        await TokenContractStub.Approve.SendAsync(new ApproveInput
+        {
+            Amount = 20,
+            Symbol = "*",
+            Spender = User1Address
+        });
+        
+        await TokenContractStub.Approve.SendAsync(new ApproveInput
+        {
+            Amount = 1000,
+            Symbol = "ABC-*",
+            Spender = User1Address
+        });
+        {
+            var realAllowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+            {
+                Owner = DefaultAddress,
+                Spender = User1Address,
+                Symbol = "ABC-1"
+            });
+            realAllowance.Allowance.ShouldBe(0);
+        }
+        var allowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "ABC-1"
+        });
+        allowance.Allowance.ShouldBe(1000);
+        allowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "ELF"
+        });
+        allowance.Allowance.ShouldBe(20);
+        var user1Stub =
+            GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, User1KeyPair);
+        var result2 = await user1Stub.TransferFrom.SendAsync(new TransferFromInput
+        {
+            Amount = 50,
+            From = DefaultAddress,
+            Memo = "test",
+            Symbol = "ABC-1",
+            To = User1Address
+        }); 
+        result2.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
+        allowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "ABC-1"
+        });
+        allowance.Allowance.ShouldBe(1000-50);
+        allowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "*"
+        });
+        allowance.Allowance.ShouldBe(20);
+        
+    }
+    
+    [Fact]
+    public async Task MultiTokenContract_TransferFrom_Token_Test()
+    {
+        await CreateAndIssueToken();
+        await TokenContractStub.Approve.SendAsync(new ApproveInput
+        {
+            Amount = 100_00000000,
+            Symbol = "*",
+            Spender = User1Address
+        });
+        var allowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "SSS"
+        });
+        allowance.Allowance.ShouldBe(0);
+        {
+            var realAllowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+            {
+                Owner = DefaultAddress,
+                Spender = User1Address,
+                Symbol = "SSS"
+            });
+            realAllowance.Allowance.ShouldBe(100_00000000);
+        }
+        allowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "ELF"
+        });
+        allowance.Allowance.ShouldBe(0);
+        {
+            var realAllowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+            {
+                Owner = DefaultAddress,
+                Spender = User1Address,
+                Symbol = "SSS"
+            });
+            realAllowance.Allowance.ShouldBe(100_00000000);
+        }
+        var user1Stub =
+            GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, User1KeyPair);
+        var result2 = await user1Stub.TransferFrom.SendAsync(new TransferFromInput
+        {
+            Amount = 50_00000000,
+            From = DefaultAddress,
+            Memo = "test",
+            Symbol = "SSS",
+            To = User1Address
+        }); 
+        result2.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
+        allowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "SSS"
+        });
+        allowance.Allowance.ShouldBe(100_00000000-50_00000000);
+        var balance = await TokenContractStub.GetBalance.CallAsync(new GetBalanceInput
+        {
+            Owner = DefaultAddress,
+            Symbol = "SSS"
+        });
+        balance.Balance.ShouldBe(TotalSupply - 50_00000000);
+        balance = await TokenContractStub.GetBalance.CallAsync(new GetBalanceInput
+        {
+            Owner = User1Address,
+            Symbol = "SSS"
+        });
+        balance.Balance.ShouldBe(50_00000000);
+    }
+
+    private async Task CreateAndIssueToken()
+    {
+        await CreateMutiTokenAsync(TokenContractStub, new CreateInput
+        {
+            TokenName = "Test",
+            TotalSupply = TotalSupply,
+            Decimals = 8,
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress,
+            IssueChainId = _chainId,
+            Symbol = "SSS"
+        });
+        await TokenContractStub.Issue.SendAsync(new IssueInput
+        {
+            Symbol = "SSS",
+            Amount = TotalSupply,
+            To = DefaultAddress,
+            Memo = "Issue"
+        });
+        var balance = await TokenContractStub.GetBalance.CallAsync(new GetBalanceInput
+        {
+            Owner = DefaultAddress,
+            Symbol = "SSS"
+        });
+        balance.Balance.ShouldBe(TotalSupply);
+    }
+    [Fact]
+    public async Task MultiTokenContract_Approve_Test_New()
+    {
+        await CreateAndIssueToken();
+        await TokenContractStub.Approve.SendAsync(new ApproveInput
+        {
+            Spender = User1Address,
+            Symbol = "SSS",
+            Amount = 100_000000000
+        });
+        var allowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "SSS"
+        });
+        allowance.Allowance.ShouldBe(100_000000000);
+        await TokenContractStub.Approve.SendAsync(new ApproveInput
+        {
+            Spender = User1Address,
+            Symbol = "*",
+            Amount = 200_000000000
+        });
+        {
+            var realAllowance = await TokenContractStub.GetAllowance.CallAsync(new GetAllowanceInput
+            {
+                Owner = DefaultAddress,
+                Spender = User1Address,
+                Symbol = "SSS"
+            });
+            realAllowance.Allowance.ShouldBe(100_000000000);
+        }
+        allowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "SSS"
+        });
+        allowance.Allowance.ShouldBe(200_000000000);
+        allowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "*"
+        });
+        allowance.Allowance.ShouldBe(200_000000000);
+        await TokenContractStub.UnApprove.SendAsync(new UnApproveInput
+        {
+            Spender = User1Address,
+            Symbol = "*",
+            Amount = 20_000000000
+        });
+        allowance = await TokenContractStub.GetAvailableAllowance.CallAsync(new GetAllowanceInput
+        {
+            Owner = DefaultAddress,
+            Spender = User1Address,
+            Symbol = "*"
+        });
+        allowance.Allowance.ShouldBe(200_000000000-20_000000000);
+    }
+    
+    [Fact]
+    public async Task MultiTokenContract_Approve_Test_New_Fail()
+    {
+        await CreateAndIssueToken();
+        {
+            var executionResult = await TokenContractStub.Approve.SendWithExceptionAsync(new ApproveInput
+            {
+                Spender = User1Address,
+                Symbol = "SSS*",
+                Amount = 100_000000000
+            });
+            executionResult.TransactionResult.Error.ShouldContain("Invalid symbol.");
+        }
+        {
+            var executionResult = await TokenContractStub.Approve.SendWithExceptionAsync(new ApproveInput
+            {
+                Spender = User1Address,
+                Symbol = "SSS**",
+                Amount = 100_000000000
+            });
+            executionResult.TransactionResult.Error.ShouldContain("Invalid symbol.");
+        }
+        {
+            var executionResult = await TokenContractStub.Approve.SendWithExceptionAsync(new ApproveInput
+            {
+                Spender = User1Address,
+                Symbol = "*-*",
+                Amount = 100_000000000
+            });
+            executionResult.TransactionResult.Error.ShouldContain("Token is not found");
+        }
+    }
+    
+    [Fact]
+    public async Task MultiTokenContract_Approve_Test_New_Nft_Fail()
+    {
+        await CreateNft();
+        await TokenContractStub.Issue.SendAsync(new IssueInput
+        {
+            Symbol = "ABC-1",
+            Amount = 100,
+            To = DefaultAddress,
+            Memo = "test"
+        });
+        {
+            var executionResult = await TokenContractStub.Approve.SendWithExceptionAsync(new ApproveInput
+            {
+                Spender = User1Address,
+                Symbol = "AB*-*",
+                Amount = 100_000000000
+            });
+            executionResult.TransactionResult.Error.ShouldContain("Invalid Symbol");
+        }
+        {
+            var executionResult = await TokenContractStub.Approve.SendWithExceptionAsync(new ApproveInput
+            {
+                Spender = User1Address,
+                Symbol = "ABC-*9",
+                Amount = 100_000000000
+            });
+            executionResult.TransactionResult.Error.ShouldContain("Invalid NFT Symbol.");
+        }
+    }
+
     private async Task CreateTokenAndIssue(List<Address> whitelist = null, Address issueTo = null)
     {
         if (whitelist == null)
@@ -372,12 +959,13 @@ public partial class MultiTokenContractTests
                 OtherBasicFunctionContractAddress,
                 TreasuryContractAddress
             };
-        await TokenContractStub.Create.SendAsync(new CreateInput
+        await CreateMutiTokenAsync(TokenContractStub,new CreateInput
         {
             Symbol = SymbolForTest,
             Decimals = 2,
             IsBurnable = true,
             Issuer = DefaultAddress,
+            Owner = DefaultAddress,
             TokenName = "elf test token",
             TotalSupply = DPoSContractConsts.LockTokenForElection * 1000000,
             LockWhiteList =
@@ -811,14 +1399,15 @@ public partial class MultiTokenContractTests
     {
         await CreateAndIssueMultiTokensAsync();
         var unburnedTokenSymbol = "UNBURNED";
-        await TokenContractStub.Create.SendAsync(new CreateInput
+        await CreateMutiTokenAsync(TokenContractStub, new CreateInput
         {
             Symbol = unburnedTokenSymbol,
             TokenName = "Name",
             TotalSupply = 100_000_000_000L,
             Decimals = 10,
             IsBurnable = false,
-            Issuer = DefaultAddress
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress,
         });
         var burnRet = await TokenContractStub.Burn.SendWithExceptionAsync(new BurnInput
         {
@@ -940,69 +1529,6 @@ public partial class MultiTokenContractTests
         afterBalance.Balance.ShouldBe(beforeBalance.Balance.Add(transferAmount));
     }
 
-    [Fact(DisplayName = "[MultiToken] ChangeTokenIssuer test")]
-    public async Task ChangeTokenIssuer_Test()
-    {
-        const string tokenSymbol = "PO";
-        await CreateAndIssueMultiTokensAsync();
-        await TokenContractStub.Create.SendAsync(new CreateInput
-        {
-            Symbol = tokenSymbol,
-            TokenName = "Name",
-            TotalSupply = 100_000_000_000L,
-            Decimals = 10,
-            IsBurnable = true,
-            Issuer = Accounts[1].Address
-        });
-        var tokenIssuerStub =
-            GetTester<TokenContractImplContainer.TokenContractImplStub>(TokenContractAddress, Accounts[1].KeyPair);
-
-        {
-            var issueNotExistTokenRet = await tokenIssuerStub.ChangeTokenIssuer.SendWithExceptionAsync(
-                new ChangeTokenIssuerInput
-                {
-                    Symbol = "NOTEXIST",
-                    NewTokenIssuer = Accounts[2].Address
-                });
-            issueNotExistTokenRet.TransactionResult.Error.ShouldContain("invalid token symbol");
-        }
-        {
-            await tokenIssuerStub.ChangeTokenIssuer.SendAsync(new ChangeTokenIssuerInput
-            {
-                Symbol = tokenSymbol,
-                NewTokenIssuer = Accounts[2].Address
-            });
-            var tokenInfo = await tokenIssuerStub.GetTokenInfo.CallAsync(new GetTokenInfoInput
-            {
-                Symbol = tokenSymbol
-            });
-            tokenInfo.Issuer.ShouldBe(Accounts[2].Address);
-        }
-    }
-
-    [Fact(DisplayName = "[MultiToken] sender is not the token issuer")]
-    public async Task ChangeTokenIssuer_Without_Authorization_Test()
-    {
-        const string tokenSymbol = "PO";
-        await CreateAndIssueMultiTokensAsync();
-        await TokenContractStub.Create.SendAsync(new CreateInput
-        {
-            Symbol = tokenSymbol,
-            TokenName = "Name",
-            TotalSupply = 100_000_000_000L,
-            Decimals = 10,
-            IsBurnable = true,
-            Issuer = Accounts[1].Address
-        });
-        var changeIssuerRet = await TokenContractStub.ChangeTokenIssuer.SendWithExceptionAsync(
-            new ChangeTokenIssuerInput
-            {
-                Symbol = tokenSymbol,
-                NewTokenIssuer = Accounts[2].Address
-            });
-        changeIssuerRet.TransactionResult.Error.ShouldContain("permission denied");
-    }
-
     [Fact(DisplayName = "[MultiToken] Token initialize from parent chain test")]
     public async Task InitializeFromParent_Test()
     {
@@ -1058,15 +1584,21 @@ public partial class MultiTokenContractTests
             });
         await ApproveWithMinersAsync(proposalId);
         await ParliamentContractStub.Release.SendAsync(proposalId);
-        var createTokenRet = await TokenContractStub.Create.SendWithExceptionAsync(new CreateInput
-        {
-            Symbol = "ALI",
-            TokenName = "Ali",
-            Decimals = 4,
-            TotalSupply = 100_000,
-            Issuer = DefaultAddress
-        });
-        createTokenRet.TransactionResult.Error.ShouldContain(
+
+        proposalId = await CreateProposalAsync(TokenContractAddress,
+            defaultParliament, nameof(TokenContractStub.Create),
+            new CreateInput
+            {
+                Symbol = "ALI",
+                TokenName = "Ali",
+                Decimals = 4,
+                TotalSupply = 100_000,
+                Issuer = DefaultAddress,
+                Owner = DefaultAddress
+            });
+        await ApproveWithMinersAsync(proposalId);
+        var createTokenRe = await ParliamentContractStub.Release.SendWithExceptionAsync(proposalId);
+        createTokenRe.TransactionResult.Error.ShouldContain(
             "Failed to create token if side chain creator already set.");
     }
 
@@ -1078,7 +1610,6 @@ public partial class MultiTokenContractTests
     public async Task CheckThreshold_With_One_Token_Test(long totalSupply, long issueAmount, long ApproveAmount,
         long checkAmount, bool isCheckAllowance, bool isThrowException)
     {
-        await CreateNativeTokenAsync();
         var tokenA = "AITA";
         await CreateAndIssueCustomizeTokenAsync(DefaultAddress, tokenA, totalSupply, issueAmount);
         if (ApproveAmount > 0)
@@ -1122,7 +1653,6 @@ public partial class MultiTokenContractTests
     public async Task CheckThreshold_With_Multiple_Token_Test(long tokenACheckAmount, long tokenAApporveAmount,
         long tokenBCheckAmount, long tokenBApporveAmount, bool isCheckAllowance, bool isThrowException)
     {
-        await CreateNativeTokenAsync();
         var tokenA = "AITA";
         await CreateAndIssueCustomizeTokenAsync(DefaultAddress, tokenA, 10000, 1000);
         var tokenB = "AITB";
@@ -1170,10 +1700,11 @@ public partial class MultiTokenContractTests
         long issueAmount,
         Address to = null, params string[] otherParameters)
     {
-        await TokenContractStub.Create.SendAsync(new CreateInput
+        await CreateMutiTokenAsync(TokenContractStub,new CreateInput
         {
             Symbol = symbol,
             Issuer = creator,
+            Owner = creator,
             TokenName = symbol + "name",
             TotalSupply = totalSupply,
             Decimals = 4
@@ -1184,5 +1715,182 @@ public partial class MultiTokenContractTests
             Amount = issueAmount,
             To = to == null ? creator : to
         });
+    }
+
+    [Fact]
+    public async Task ValidateTokenInfoExists_ExternalInfo_Test()
+    {
+        await CreateMutiTokenAsync(TokenContractStub, new CreateInput
+        {
+            Symbol = AliceCoinTokenInfo.Symbol,
+            TokenName = AliceCoinTokenInfo.TokenName,
+            TotalSupply = AliceCoinTokenInfo.TotalSupply,
+            Decimals = AliceCoinTokenInfo.Decimals,
+            Issuer = AliceCoinTokenInfo.Issuer,
+            Owner = AliceCoinTokenInfo.Issuer,
+            IsBurnable = AliceCoinTokenInfo.IsBurnable,
+            LockWhiteList =
+            {
+                BasicFunctionContractAddress,
+                OtherBasicFunctionContractAddress,
+                TokenConverterContractAddress,
+                TreasuryContractAddress
+            }
+        });
+
+        var result = await TokenContractStub.ValidateTokenInfoExists.SendAsync(
+            new ValidateTokenInfoExistsInput
+            {
+                Symbol = AliceCoinTokenInfo.Symbol,
+                TokenName = AliceCoinTokenInfo.TokenName,
+                TotalSupply = AliceCoinTokenInfo.TotalSupply,
+                Decimals = AliceCoinTokenInfo.Decimals,
+                Issuer = AliceCoinTokenInfo.Issuer,
+                Owner = AliceCoinTokenInfo.Issuer,
+                IsBurnable = AliceCoinTokenInfo.IsBurnable,
+                IssueChainId = _chainId
+            });
+
+        result.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
+
+        result = await TokenContractStub.ValidateTokenInfoExists.SendWithExceptionAsync(
+            new ValidateTokenInfoExistsInput
+            {
+                Symbol = AliceCoinTokenInfo.Symbol,
+                TokenName = AliceCoinTokenInfo.TokenName,
+                TotalSupply = AliceCoinTokenInfo.TotalSupply,
+                Decimals = AliceCoinTokenInfo.Decimals,
+                Issuer = AliceCoinTokenInfo.Issuer,
+                Owner = AliceCoinTokenInfo.Issuer,
+                IsBurnable = AliceCoinTokenInfo.IsBurnable,
+                ExternalInfo = { { "key", "value" } }
+            });
+
+        result.TransactionResult.Status.ShouldBe(TransactionResultStatus.Failed);
+    }
+
+    [Fact]
+    public async Task CrossContractCreateToken_Test()
+    {
+        var fee = await TokenContractStub.GetMethodFee.CallAsync(new StringValue { Value = "Create" });
+        var createTokenInput = new CreateTokenThroughMultiTokenInput
+        {
+            Symbol = "TEST",
+            Decimals = 8,
+            TokenName = "TEST token",
+            Issuer = DefaultAddress,
+            IsBurnable = true,
+            TotalSupply = TotalSupply,
+            ExternalInfo = new TestContract.BasicFunction.ExternalInfo()
+        };
+        var input = new CreateInput
+        {
+            Symbol = SeedNFTSymbolPre + 100,
+            Decimals = 0,
+            IsBurnable = true,
+            TokenName = "seed token" + 100,
+            TotalSupply = 1,
+            Issuer = DefaultAddress,
+            ExternalInfo = new ExternalInfo(),
+            LockWhiteList = { TokenContractAddress },
+            Owner = DefaultAddress
+        };
+        input.ExternalInfo.Value["__seed_owned_symbol"] = createTokenInput.Symbol;
+        input.ExternalInfo.Value["__seed_exp_time"] = TimestampHelper.GetUtcNow().AddDays(1).Seconds.ToString();
+        await TokenContractStub.Create.SendAsync(input);
+        await TokenContractStub.Issue.SendAsync(new IssueInput
+        {
+            Symbol = input.Symbol,
+            Amount = 1,
+            Memo = "ddd",
+            To = BasicFunctionContractAddress
+        });
+
+        var result = await BasicFunctionContractStub.CreateTokenThroughMultiToken.SendAsync(createTokenInput);
+        result.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined);
+        var checkTokenInfo = await TokenContractStub.GetTokenInfo.CallAsync(new GetTokenInfoInput { Symbol = "TEST" });
+        checkTokenInfo.Decimals.ShouldBe(createTokenInput.Decimals);
+        checkTokenInfo.Issuer.ShouldBe(createTokenInput.Issuer);
+        checkTokenInfo.Decimals.ShouldBe(createTokenInput.Decimals);
+        checkTokenInfo.TokenName.ShouldBe(createTokenInput.TokenName);
+        checkTokenInfo.TotalSupply.ShouldBe(createTokenInput.TotalSupply);
+        checkTokenInfo.IsBurnable.ShouldBe(createTokenInput.IsBurnable);
+        checkTokenInfo.ExternalInfo.Value.ShouldBe(createTokenInput.ExternalInfo.Value);
+    }
+
+    [Fact]
+    public async Task TokenIssuerAndOwnerModification_Test()
+    {
+        var result = await TokenContractStub.ModifyTokenIssuerAndOwner.SendWithExceptionAsync(new ModifyTokenIssuerAndOwnerInput());
+        result.TransactionResult.Error.ShouldContain("Invalid input symbol.");
+        
+        result = await TokenContractStub.ModifyTokenIssuerAndOwner.SendWithExceptionAsync(new ModifyTokenIssuerAndOwnerInput
+        {
+            Symbol = "TEST"
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid input issuer.");
+        
+        result = await TokenContractStub.ModifyTokenIssuerAndOwner.SendWithExceptionAsync(new ModifyTokenIssuerAndOwnerInput
+        {
+            Symbol = "TEST",
+            Issuer = DefaultAddress
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid input owner.");
+        
+        result = await TokenContractStub.ModifyTokenIssuerAndOwner.SendWithExceptionAsync(new ModifyTokenIssuerAndOwnerInput
+        {
+            Symbol = "TEST",
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress
+        });
+        result.TransactionResult.Error.ShouldContain("Token is not found.");
+        
+        result = await TokenContractStubUser.ModifyTokenIssuerAndOwner.SendWithExceptionAsync(new ModifyTokenIssuerAndOwnerInput
+        {
+            Symbol = DefaultSymbol,
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress
+        });
+        result.TransactionResult.Error.ShouldContain("Only token issuer can set token issuer and owner.");
+        
+        result = await TokenContractStub.ModifyTokenIssuerAndOwner.SendWithExceptionAsync(new ModifyTokenIssuerAndOwnerInput
+        {
+            Symbol = DefaultSymbol,
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress
+        });
+        result.TransactionResult.Error.ShouldContain("Can only set token which does not have owner.");
+        
+        var output = await TokenContractStub.GetTokenIssuerAndOwnerModificationEnabled.CallAsync(new Empty());
+        output.Value.ShouldBeTrue();
+        
+        result = await TokenContractStub.SetTokenIssuerAndOwnerModificationEnabled.SendWithExceptionAsync(
+            new SetTokenIssuerAndOwnerModificationEnabledInput
+            {
+                Enabled = false
+            });
+        result.TransactionResult.Error.ShouldContain("Unauthorized behavior.");
+        
+        var defaultParliament = await ParliamentContractStub.GetDefaultOrganizationAddress.CallAsync(new Empty());
+        var proposalId = await CreateProposalAsync(TokenContractAddress,
+            defaultParliament, nameof(TokenContractStub.SetTokenIssuerAndOwnerModificationEnabled),
+            new SetTokenIssuerAndOwnerModificationEnabledInput
+            {
+                Enabled = false
+            });
+        await ApproveWithMinersAsync(proposalId);
+        await ParliamentContractStub.Release.SendAsync(proposalId);
+        
+        output = await TokenContractStub.GetTokenIssuerAndOwnerModificationEnabled.CallAsync(new Empty());
+        output.Value.ShouldBeFalse();
+        
+        result = await TokenContractStub.ModifyTokenIssuerAndOwner.SendWithExceptionAsync(new ModifyTokenIssuerAndOwnerInput
+        {
+            Symbol = DefaultSymbol,
+            Issuer = DefaultAddress,
+            Owner = DefaultAddress
+        });
+        result.TransactionResult.Error.ShouldContain("Set token issuer and owner disabled.");
+
     }
 }

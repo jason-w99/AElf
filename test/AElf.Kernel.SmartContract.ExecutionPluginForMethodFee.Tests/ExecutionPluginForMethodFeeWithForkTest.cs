@@ -33,7 +33,7 @@ public sealed class ExecutionPluginForMethodFeeWithForkTest : ExecutionPluginFor
     public async Task ChargeFee_With_Fork_Test()
     {
         var amount = 100000;
-
+        
         await SetMethodFeeWithProposalAsync(new MethodFees
         {
             MethodName = nameof(TokenContractContainer.TokenContractStub.Transfer),
@@ -55,8 +55,9 @@ public sealed class ExecutionPluginForMethodFeeWithForkTest : ExecutionPluginFor
                 Memo = Guid.NewGuid().ToString(),
                 To = SampleAddress.AddressList[0]
             });
+        var fromAddress = Address.FromPublicKey(Tester.KeyPair.PublicKey);
         var transactionResult = await Tester.GetTransactionResultAsync(result.Item2.GetHash());
-        var targetFee = transactionResult.GetChargedTransactionFees().First().Value;
+        var targetFee = transactionResult.GetChargedTransactionFees()[fromAddress].First().Value;
 
         var transactionFeesMap = await GetTransactionFeesMapAsync(new ChainContext
         {
@@ -74,6 +75,7 @@ public sealed class ExecutionPluginForMethodFeeWithForkTest : ExecutionPluginFor
                 BlockHash = branchOneBlock.GetHash(), BlockHeight = branchOneBlock.Height
             });
             transactionFeesMap.ShouldBeNull();
+            
             await SetMethodFeeWithProposalAsync(new MethodFees
             {
                 MethodName = nameof(TokenContractContainer.TokenContractStub.Transfer),
@@ -96,13 +98,13 @@ public sealed class ExecutionPluginForMethodFeeWithForkTest : ExecutionPluginFor
                     To = SampleAddress.AddressList[0]
                 });
             transactionResult = await Tester.GetTransactionResultAsync(result.Item2.GetHash());
-            var fee = transactionResult.GetChargedTransactionFees().First().Value;
+            var fee = transactionResult.GetChargedTransactionFees()[fromAddress].First().Value;
             transactionFeesMap = await GetTransactionFeesMapAsync(new ChainContext
             {
                 BlockHash = result.Item1.GetHash(), BlockHeight = result.Item1.Height
             });
             transactionFeesMap.First().Value.ShouldBe(fee); //300000
-            targetFee.ShouldNotBe(fee);
+            targetFee.ShouldBe(fee);
         }
 
         // branch two
@@ -128,18 +130,20 @@ public sealed class ExecutionPluginForMethodFeeWithForkTest : ExecutionPluginFor
     public async Task Claim_Fee_Send_By_User_Fail_Test()
     {
         var amount = 100000;
-        await SetMethodFeeWithProposalAsync(new MethodFees
-        {
-            MethodName = nameof(TokenContractContainer.TokenContractStub.Transfer),
-            Fees =
+        
+        await Tester.ExecuteContractWithMiningAsync(TokenContractAddress,
+            nameof(TokenContractImplContainer.TokenContractImplStub.SetMethodFee), new MethodFees
             {
-                new MethodFee
+                MethodName = nameof(TokenContractContainer.TokenContractStub.Transfer),
+                Fees =
                 {
-                    Symbol = "ELF",
-                    BasicFee = amount
+                    new MethodFee
+                    {
+                        Symbol = "ELF",
+                        BasicFee = amount
+                    }
                 }
-            }
-        }.ToByteString());
+            });
 
         await Tester.ExecuteContractWithMiningReturnBlockAsync(TokenContractAddress,
             nameof(TokenContractContainer.TokenContractStub.Transfer), new TransferInput

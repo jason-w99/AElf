@@ -710,6 +710,7 @@ public class ContractTester<TContractTestAElfModule> : ITransientDependency
             TotalSupply = totalSupply,
             Decimals = 8,
             Issuer = issuer,
+            Owner = issuer,
             IsBurnable = true
         });
         tokenContractCallList.Add(nameof(TokenContract.SetPrimaryTokenSymbol),
@@ -767,6 +768,7 @@ public class ContractTester<TContractTestAElfModule> : ITransientDependency
             Symbol = "ELF",
             Decimals = 2,
             Issuer = issuer,
+            Owner = issuer,
             IsBurnable = true,
             TokenName = "elf token",
             TotalSupply = TokenTotalSupply,
@@ -781,25 +783,30 @@ public class ContractTester<TContractTestAElfModule> : ITransientDependency
                 Decimals = nativeTokenInfo.Decimals,
                 IssueChainId = nativeTokenInfo.IssueChainId,
                 Issuer = nativeTokenInfo.Issuer,
+                Owner = nativeTokenInfo.Issuer,
                 IsBurnable = nativeTokenInfo.IsBurnable,
                 Symbol = nativeTokenInfo.Symbol,
                 TokenName = nativeTokenInfo.TokenName,
                 TotalSupply = nativeTokenInfo.TotalSupply
             });
 
-        tokenInitializationCallList.Add(
-            nameof(TokenContract.Create),
-            new CreateInput
-            {
-                Decimals = 2,
-                IsBurnable = true,
-                Issuer = Address.FromPublicKey(KeyPair.PublicKey),
-                TotalSupply = 1_000_000_000,
-                Symbol = symbol,
-                TokenName = "TEST",
-                IssueChainId = chainOptions.ChainId
-            }
-        );
+        if (symbol != "ELF")
+        {
+            tokenInitializationCallList.Add(
+                nameof(TokenContract.Create),
+                new CreateInput
+                {
+                    Decimals = 2,
+                    IsBurnable = true,
+                    Issuer = Address.FromPublicKey(KeyPair.PublicKey),
+                    Owner = Address.FromPublicKey(KeyPair.PublicKey),
+                    TotalSupply = 1_000_000_000,
+                    Symbol = symbol,
+                    TokenName = "TEST",
+                    IssueChainId = chainOptions.ChainId
+                }
+            );
+        }
 
         tokenInitializationCallList.Add(nameof(TokenContract.SetPrimaryTokenSymbol),
             new SetPrimaryTokenSymbolInput

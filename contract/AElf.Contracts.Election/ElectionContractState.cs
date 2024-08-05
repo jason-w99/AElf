@@ -15,6 +15,7 @@ public partial class ElectionContractState : ContractState
     public SingletonState<Hash> FlexibleHash { get; set; }
     public SingletonState<Hash> WelcomeHash { get; set; }
 
+    // Old:Pubkey/New:Address -> ElectorVote
     public MappedState<string, ElectorVote> ElectorVotes { get; set; }
 
     public MappedState<string, CandidateVote> CandidateVotes { get; set; }
@@ -96,4 +97,5 @@ public partial class ElectionContractState : ContractState
     public BoolState ElectionEnabled { get; set; }
 
     public MappedState<Hash, bool> WeightsAlreadyFixedMap { get; set; }
+    
 }

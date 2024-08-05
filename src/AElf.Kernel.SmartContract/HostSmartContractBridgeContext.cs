@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AElf.Cryptography;
 using AElf.CSharp.Core;
+using AElf.CSharp.Core.Extension;
 using AElf.Kernel.Account.Application;
 using AElf.Kernel.SmartContract.Application;
 using AElf.Types;
@@ -110,6 +111,11 @@ public class HostSmartContractBridgeContext : IHostSmartContractBridgeContext, I
 
     public async Task<ByteString> GetStateAsync(string key)
     {
+        if (key.Length > SmartContractConstants.StateKeyMaximumLength)
+        {
+            throw new StateKeyOverSizeException(
+                $"Length of state key {key} exceeds limit of {SmartContractConstants.StateKeyMaximumLength}.");
+        }
         return await _smartContractBridgeService.GetStateAsync(
             Self, key, CurrentHeight - 1, PreviousBlockHash);
     }
@@ -241,6 +247,21 @@ public class HostSmartContractBridgeContext : IHostSmartContractBridgeContext, I
             Params = args
         });
     }
+    
+    public void SendVirtualInline(Hash fromVirtualAddress, Address toAddress, string methodName,
+        ByteString args, bool logTransaction)
+    {
+        var transaction = new Transaction
+        {
+            From = ConvertVirtualAddressToContractAddress(fromVirtualAddress, Self),
+            To = toAddress,
+            MethodName = methodName,
+            Params = args
+        };
+        TransactionContext.Trace.InlineTransactions.Add(transaction);
+        if (!logTransaction) return;
+        FireVirtualTransactionLogEvent(fromVirtualAddress, transaction);
+    }
 
     public void SendVirtualInlineBySystemContract(Hash fromVirtualAddress, Address toAddress, string methodName,
         ByteString args)
@@ -252,6 +273,36 @@ public class HostSmartContractBridgeContext : IHostSmartContractBridgeContext, I
             MethodName = methodName,
             Params = args
         });
+    }
+    
+    public void SendVirtualInlineBySystemContract(Hash fromVirtualAddress, Address toAddress, string methodName,
+        ByteString args, bool logTransaction)
+    {
+        var transaction = new Transaction
+        {
+            From = ConvertVirtualAddressToContractAddressWithContractHashName(fromVirtualAddress, Self),
+            To = toAddress,
+            MethodName = methodName,
+            Params = args
+        };
+        TransactionContext.Trace.InlineTransactions.Add(transaction);
+        if (!logTransaction) return;
+        FireVirtualTransactionLogEvent(fromVirtualAddress, transaction);
+    }
+    
+    
+    private void FireVirtualTransactionLogEvent(Hash fromVirtualAddress, Transaction transaction)
+    {
+        var log = new VirtualTransactionCreated
+        {
+            From = transaction.From,
+            To = transaction.To,
+            VirtualHash = fromVirtualAddress,
+            MethodName = transaction.MethodName,
+            Params = transaction.Params,
+            Signatory = Sender
+        };
+        FireLogEvent(log.ToLogEvent(Self));
     }
 
     public Address ConvertVirtualAddressToContractAddress(Hash virtualAddress, Address contractAddress)
@@ -320,9 +371,48 @@ public class HostSmartContractBridgeContext : IHostSmartContractBridgeContext, I
         AsyncHelper.RunSync(() => _smartContractBridgeService.UpdateContractAsync(contractDto));
     }
 
+    public ContractInfoDto DeploySmartContract(Address address, SmartContractRegistration registration, Hash name)
+    {
+        if (!Self.Equals(_smartContractBridgeService.GetZeroSmartContractAddress())) throw new NoPermissionException();
+
+        return AsyncHelper.RunSync(() =>
+            _smartContractBridgeService.DeployContractAsync(registration));
+    }
+
+    public ContractInfoDto UpdateSmartContract(Address address, SmartContractRegistration registration, Hash name, string previousContractVersion)
+    {
+        if (!Self.Equals(_smartContractBridgeService.GetZeroSmartContractAddress())) throw new NoPermissionException();
+
+        return AsyncHelper.RunSync(() =>
+            _smartContractBridgeService.UpdateContractAsync(previousContractVersion, registration));
+    }
+
+    public ContractVersionCheckDto CheckContractVersion(string previousContractVersion, SmartContractRegistration registration)
+    {
+        if (!Self.Equals(_smartContractBridgeService.GetZeroSmartContractAddress())) throw new NoPermissionException();
+
+        return AsyncHelper.RunSync(() =>
+            _smartContractBridgeService.CheckContractVersionAsync(previousContractVersion, registration));
+    }
+
     public byte[] RecoverPublicKey(byte[] signature, byte[] hash)
     {
         var cabBeRecovered = CryptoHelper.RecoverPublicKey(signature, hash, out var publicKey);
         return !cabBeRecovered ? null : publicKey;
+    }
+
+    public bool ECVrfVerify(byte[] pubKey, byte[] alpha, byte[] pi, out byte[] beta)
+    {
+        try
+        {
+            beta = CryptoHelper.ECVrfVerify(pubKey, alpha, pi);
+        }
+        catch
+        {
+            beta = null;
+            return false;
+        }
+
+        return true;
     }
 }

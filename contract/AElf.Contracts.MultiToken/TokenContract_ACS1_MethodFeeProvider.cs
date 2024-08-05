@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using AElf.Sdk.CSharp;
 using AElf.Standards.ACS1;
 using AElf.Standards.ACS3;
@@ -46,22 +47,8 @@ public partial class TokenContract
                 MethodName = input.Value,
                 IsSizeFeeFree = true
             };
-
-        if (input.Value == nameof(Create))
-            return new MethodFees
-            {
-                MethodName = input.Value,
-                Fees =
-                {
-                    new MethodFee
-                    {
-                        Symbol = Context.Variables.NativeSymbol,
-                        BasicFee = 10000_00000000
-                    }
-                }
-            };
-
-        return State.TransactionFees[input.Value];
+        var fees = State.TransactionFees[input.Value];
+        return fees;
     }
 
     public override AuthorityInfo GetMethodFeeController(Empty input)
@@ -74,13 +61,32 @@ public partial class TokenContract
 
     #region private methods
 
-    private List<string> GetMethodFeeSymbols()
+    private List<string> GetTransactionFeeSymbols(string methodName)
     {
         var symbols = new List<string>();
-        var primaryTokenSymbol = GetPrimaryTokenSymbol(new Empty()).Value;
-        if (primaryTokenSymbol != string.Empty) symbols.Add(primaryTokenSymbol);
+        if (State.TransactionFees[methodName] != null)
+        {
+            foreach (var methodFee in State.TransactionFees[methodName].Fees)
+            {
+                if (!symbols.Contains(methodFee.Symbol) && methodFee.BasicFee > 0)
+                    symbols.Add(methodFee.Symbol);
+            }
+            if (State.TransactionFees[methodName].IsSizeFeeFree)
+            {
+                return symbols;
+            }
+        }
+        
+        if (State.SymbolListToPayTxSizeFee.Value == null) return symbols;
+        
+        foreach (var sizeFee in State.SymbolListToPayTxSizeFee.Value.SymbolsToPayTxSizeFee)
+        {
+            if (!symbols.Contains(sizeFee.TokenSymbol))
+                symbols.Add(sizeFee.TokenSymbol);
+        }
         return symbols;
     }
+
 
     private void RequiredMethodFeeControllerSet()
     {
@@ -117,9 +123,12 @@ public partial class TokenContract
     private void AssertValidFeeToken(string symbol, long amount)
     {
         AssertValidSymbolAndAmount(symbol, amount);
-        if (State.TokenInfos[symbol] == null)
+        var tokenInfo = GetTokenInfo(symbol);
+        if (tokenInfo == null)
+        {
             throw new AssertionException("Token is not found");
-        Assert(State.TokenInfos[symbol].IsBurnable, $"Token {symbol} cannot set as method fee.");
+        }
+        Assert(tokenInfo.IsBurnable, $"Token {symbol} cannot set as method fee.");
     }
 
     #endregion

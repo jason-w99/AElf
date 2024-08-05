@@ -100,7 +100,6 @@ public class KernelTestHelper
 
         return chain;
     }
-
     public Transaction GenerateTransaction(long refBlockNumber = 0, Hash refBlockHash = null)
     {
         var transaction = new Transaction

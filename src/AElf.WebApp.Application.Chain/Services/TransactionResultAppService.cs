@@ -7,6 +7,7 @@ using AElf.Kernel;
 using AElf.Kernel.Blockchain.Application;
 using AElf.Kernel.Blockchain.Domain;
 using AElf.Kernel.SmartContract.Application;
+using AElf.Kernel.TransactionPool;
 using AElf.Types;
 using AElf.WebApp.Application.Chain.Dto;
 using AElf.WebApp.Application.Chain.Infrastructure;
@@ -39,6 +40,7 @@ public class TransactionResultAppService : AElfAppService, ITransactionResultApp
     private readonly ITransactionResultProxyService _transactionResultProxyService;
     private readonly ITransactionResultStatusCacheProvider _transactionResultStatusCacheProvider;
     private readonly WebAppOptions _webAppOptions;
+    private readonly TransactionOptions _transactionOptions;
 
     public TransactionResultAppService(ITransactionResultProxyService transactionResultProxyService,
         ITransactionManager transactionManager,
@@ -46,7 +48,7 @@ public class TransactionResultAppService : AElfAppService, ITransactionResultApp
         ITransactionReadOnlyExecutionService transactionReadOnlyExecutionService,
         IObjectMapper<ChainApplicationWebAppAElfModule> objectMapper,
         ITransactionResultStatusCacheProvider transactionResultStatusCacheProvider,
-        IOptionsMonitor<WebAppOptions> optionsSnapshot)
+        IOptionsMonitor<WebAppOptions> optionsSnapshot, IOptionsMonitor<TransactionOptions> transactionOptions)
     {
         _transactionResultProxyService = transactionResultProxyService;
         _transactionManager = transactionManager;
@@ -54,6 +56,7 @@ public class TransactionResultAppService : AElfAppService, ITransactionResultApp
         _transactionReadOnlyExecutionService = transactionReadOnlyExecutionService;
         _objectMapper = objectMapper;
         _transactionResultStatusCacheProvider = transactionResultStatusCacheProvider;
+        _transactionOptions = transactionOptions.CurrentValue;
         _webAppOptions = optionsSnapshot.CurrentValue;
 
         Logger = NullLogger<TransactionResultAppService>.Instance;
@@ -88,33 +91,36 @@ public class TransactionResultAppService : AElfAppService, ITransactionResultApp
         output.Transaction = _objectMapper.Map<Transaction, TransactionDto>(transaction);
         output.TransactionSize = transaction?.CalculateSize() ?? 0;
 
-        if (transactionResult.Status == TransactionResultStatus.NotExisted)
+        if (transactionResult.Status != TransactionResultStatus.NotExisted)
         {
-            var validationStatus =
-                _transactionResultStatusCacheProvider.GetTransactionResultStatus(transactionIdHash);
-            if (validationStatus != null)
-            {
-                output.Status = validationStatus.TransactionResultStatus.ToString().ToUpper();
-                output.Error =
-                    TransactionErrorResolver.TakeErrorMessage(validationStatus.Error, _webAppOptions.IsDebugMode);
-            }
-
+            await FormatTransactionParamsAsync(output.Transaction, transaction.Params);
             return output;
         }
 
-        var methodDescriptor =
-            await GetContractMethodDescriptorAsync(transaction!.To, transaction.MethodName, false);
-
-        if (methodDescriptor != null)
+        var validationStatus = _transactionResultStatusCacheProvider.GetTransactionResultStatus(transactionIdHash);
+        if (validationStatus != null)
         {
-            var parameters = methodDescriptor.InputType.Parser.ParseFrom(transaction.Params);
-            if (!IsValidMessage(parameters))
-                throw new UserFriendlyException(Error.Message[Error.InvalidParams], Error.InvalidParams.ToString());
+            output.Status = validationStatus.TransactionResultStatus.ToString().ToUpper();
+            output.Error =
+                TransactionErrorResolver.TakeErrorMessage(validationStatus.Error, _webAppOptions.IsDebugMode);
+            return output;
+        }
 
-            output.Transaction.Params = JsonFormatter.ToDiagnosticString(parameters);
+        if (_transactionOptions.StoreInvalidTransactionResultEnabled)
+        {
+            var failedTransactionResult =
+                await _transactionResultProxyService.InvalidTransactionResultService.GetInvalidTransactionResultAsync(
+                    transactionIdHash);
+            if (failedTransactionResult != null)
+            {
+                output.Status = failedTransactionResult.Status.ToString().ToUpper();
+                output.Error = failedTransactionResult.Error;
+                return output;
+            }
         }
 
         return output;
+        
     }
 
     /// <summary>
@@ -244,17 +250,7 @@ public class TransactionResultAppService : AElfAppService, ITransactionResultApp
         transactionResultDto.Transaction = _objectMapper.Map<Transaction, TransactionDto>(transaction);
         transactionResultDto.TransactionSize = transaction.CalculateSize();
 
-        var methodDescriptor =
-            await GetContractMethodDescriptorAsync(transaction.To, transaction.MethodName, false);
-
-        if (methodDescriptor != null)
-        {
-            var parameters = methodDescriptor.InputType.Parser.ParseFrom(transaction.Params);
-            if (!IsValidMessage(parameters))
-                throw new UserFriendlyException(Error.Message[Error.InvalidParams], Error.InvalidParams.ToString());
-
-            transactionResultDto.Transaction.Params = JsonFormatter.ToDiagnosticString(parameters);
-        }
+        await FormatTransactionParamsAsync(transactionResultDto.Transaction, transaction.Params);
 
         return transactionResultDto;
     }
@@ -304,20 +300,6 @@ public class TransactionResultAppService : AElfAppService, ITransactionResultApp
         return HashHelper.ComputeFrom(rawBytes);
     }
 
-    private bool IsValidMessage(IMessage message)
-    {
-        try
-        {
-            JsonFormatter.ToDiagnosticString(message);
-        }
-        catch
-        {
-            return false;
-        }
-
-        return true;
-    }
-
     private async Task<MethodDescriptor> GetContractMethodDescriptorAsync(Address contractAddress,
         string methodName, bool throwException = true)
     {
@@ -330,5 +312,24 @@ public class TransactionResultAppService : AElfAppService, ITransactionResultApp
 
         return await _transactionReadOnlyExecutionService.GetContractMethodDescriptorAsync(chainContext,
             contractAddress, methodName, throwException);
+    }
+
+    private async Task FormatTransactionParamsAsync(TransactionDto transaction, ByteString @params)
+    {
+        var methodDescriptor =
+            await GetContractMethodDescriptorAsync(Address.FromBase58(transaction.To), transaction.MethodName, false);
+
+        if (methodDescriptor == null)
+            return;
+
+        try
+        {
+            var parameters = methodDescriptor.InputType.Parser.ParseFrom(@params);
+            transaction.Params = JsonFormatter.ToDiagnosticString(parameters);;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to parse transaction params: {params}", transaction.Params);
+        }
     }
 }

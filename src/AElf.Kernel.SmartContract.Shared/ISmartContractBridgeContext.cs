@@ -48,8 +48,14 @@ public interface ISmartContractBridgeContext
     bool VerifySignature(Transaction tx);
 
     void DeployContract(Address address, SmartContractRegistration registration, Hash name);
-
+    
     void UpdateContract(Address address, SmartContractRegistration registration, Hash name);
+    
+    ContractInfoDto DeploySmartContract(Address address, SmartContractRegistration registration,Hash name);
+
+    ContractInfoDto UpdateSmartContract(Address address, SmartContractRegistration registration, Hash name, string previousContractVersion);
+
+    ContractVersionCheckDto CheckContractVersion(string previousContractVersion, SmartContractRegistration registration);
 
     T Call<T>(Address fromAddress, Address toAddress, string methodName, ByteString args)
         where T : IMessage<T>, new();
@@ -58,9 +64,14 @@ public interface ISmartContractBridgeContext
 
     void SendVirtualInline(Hash fromVirtualAddress, Address toAddress, string methodName, ByteString args);
 
+    void SendVirtualInline(Hash fromVirtualAddress, Address toAddress, string methodName, ByteString args,
+        bool logTransaction);
+
     void SendVirtualInlineBySystemContract(Hash fromVirtualAddress, Address toAddress, string methodName,
         ByteString args);
 
+    void SendVirtualInlineBySystemContract(Hash fromVirtualAddress, Address toAddress, string methodName,
+        ByteString args, bool logTransaction);
 
     Address ConvertVirtualAddressToContractAddress(Hash virtualAddress, Address contractAddress);
 
@@ -82,6 +93,8 @@ public interface ISmartContractBridgeContext
     long ConvertHashToInt64(Hash hash, long start = 0, long end = long.MaxValue);
 
     object ValidateStateSize(object obj);
+
+    bool ECVrfVerify(byte[] pubKey, byte[] alpha, byte[] pi, out byte[] beta);
 }
 
 [Serializable]
@@ -187,6 +200,26 @@ public class StateOverSizeException : SmartContractBridgeException
     }
 
     protected StateOverSizeException(SerializationInfo info, StreamingContext context) : base(info, context)
+    {
+    }
+}
+
+[Serializable]
+public class StateKeyOverSizeException : SmartContractBridgeException
+{
+    public StateKeyOverSizeException()
+    {
+    }
+
+    public StateKeyOverSizeException(string message) : base(message)
+    {
+    }
+
+    public StateKeyOverSizeException(string message, Exception inner) : base(message, inner)
+    {
+    }
+
+    protected StateKeyOverSizeException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
     }
 }

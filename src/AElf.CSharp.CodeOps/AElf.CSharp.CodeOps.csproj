@@ -1,19 +1,22 @@
-<Project Sdk="Microsoft.NET.Sdk">
-    <Import Project="..\..\common.props"/>
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="..\..\common.props" />
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <Description>Smart contract code operations like auditing, patching and validating.</Description>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Mono.Cecil" Version="0.11.4"/>
+        <PackageReference Include="Basic.Reference.Assemblies.Net80" Version="1.5.0" />
+        <PackageReference Include="Mono.Cecil" Version="0.11.4" />
+        <PackageReference Include="Groth16.Net" Version="1.1.0" />
+        <PackageReference Include="Poseidon.Net" Version="0.1.1" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\AElf.Kernel.CodeCheck\AElf.Kernel.CodeCheck.csproj"/>
-        <ProjectReference Include="..\AElf.Sdk.CSharp\AElf.Sdk.CSharp.csproj"/>
+        <ProjectReference Include="..\AElf.Kernel.CodeCheck\AElf.Kernel.CodeCheck.csproj" />
+        <ProjectReference Include="..\AElf.Sdk.CSharp\AElf.Sdk.CSharp.csproj" />
     </ItemGroup>
 
 </Project>

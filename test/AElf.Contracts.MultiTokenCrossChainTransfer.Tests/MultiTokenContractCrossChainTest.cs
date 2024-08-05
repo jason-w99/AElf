@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using AElf.Contracts.Parliament;
 using AElf.ContractTestBase.ContractTestKit;
@@ -11,6 +12,7 @@ using AElf.Standards.ACS3;
 using AElf.Standards.ACS7;
 using AElf.Types;
 using Google.Protobuf;
+using Google.Protobuf.WellKnownTypes;
 using Shouldly;
 using Xunit;
 
@@ -19,11 +21,13 @@ namespace AElf.Contracts.MultiToken;
 public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTestBase
 {
     private const string SymbolForTesting = "ELFTEST";
+    private const string NFTSymbolForTesting = "ELFNFT";
     private const string NativeToken = "ELF";
     private static readonly long _totalSupply = 1000L;
     private readonly Hash _fakeBlockHeader = HashHelper.ComputeFrom("fakeBlockHeader");
     private readonly int _parentChainHeightOfCreation = 5;
     private readonly string sideChainSymbol = "STA";
+    public const string TokenAliasExternalInfoKey = "aelf_token_alias";
 
     #region register test
 
@@ -195,8 +199,8 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
 
         // Side chain create token
         var createTransaction =
-            CreateTransactionForTokenCreation(SideChainTokenContractStub, SideChainTestKit.DefaultAccount.Address,
-                SymbolForTesting);
+            await CreateTransactionForTokenCreation(SideChainTokenContractStub, SideChainTestKit.DefaultAccount.Address,
+                SymbolForTesting, SideTokenContractAddress);
         var executedSet = await SideChainTestKit.MineAsync(new List<Transaction> { createTransaction });
         var createResult = executedSet.TransactionResultMap[createTransaction.GetHash()];
         Assert.True(createResult.Status == TransactionResultStatus.Mined, createResult.Error);
@@ -236,8 +240,8 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
 
         // Main chain create token
         await BootMinerChangeRoundAsync(AEDPoSContractStub, true);
-        var createTransaction = CreateTransactionForTokenCreation(TokenContractStub,
-            DefaultAccount.Address, SymbolForTesting);
+        var createTransaction = await CreateTransactionForTokenCreation(TokenContractStub,
+            DefaultAccount.Address, SymbolForTesting, TokenContractAddress);
         var blockExecutedSet = await MineAsync(new List<Transaction> { createTransaction });
         var createResult = blockExecutedSet.TransactionResultMap[createTransaction.GetHash()];
         Assert.True(createResult.Status == TransactionResultStatus.Mined, createResult.Error);
@@ -321,21 +325,20 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
     }
 
 
-    [Fact]
+    [Fact(Skip = "Now we allow this.")]
     public async Task SideChain_CrossChainCreateToken_WithAlreadyCreated_Test()
     {
         await GenerateSideChainAsync();
         await RegisterSideChainContractAddressOnMainChainAsync();
 
         await BootMinerChangeRoundAsync(AEDPoSContractStub, true);
-        var createTransaction = CreateTransactionForTokenCreation(TokenContractStub,
-            DefaultAccount.Address, SymbolForTesting);
+        var createTransaction = await CreateTransactionForTokenCreation(TokenContractStub,
+            DefaultAccount.Address, SymbolForTesting, TokenContractAddress);
         var blockExecutedSet = await MineAsync(new List<Transaction> { createTransaction });
         var createResult = blockExecutedSet.TransactionResultMap[createTransaction.GetHash()];
         Assert.True(createResult.Status == TransactionResultStatus.Mined, createResult.Error);
-
-        var sideCreateTransaction = CreateTransactionForTokenCreation(SideChainTokenContractStub,
-            SideChainTestKit.DefaultAccount.Address, SymbolForTesting);
+        var sideCreateTransaction = await CreateTransactionForTokenCreation(SideChainTokenContractStub,
+            SideChainTestKit.DefaultAccount.Address, SymbolForTesting, SideTokenContractAddress);
         blockExecutedSet = await SideChainTestKit.MineAsync(new List<Transaction> { sideCreateTransaction });
         var sideCreateResult = blockExecutedSet.TransactionResultMap[sideCreateTransaction.GetHash()];
         Assert.True(sideCreateResult.Status == TransactionResultStatus.Mined, sideCreateResult.Error);
@@ -388,6 +391,146 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
         Assert.True(result.Status == TransactionResultStatus.Failed);
         Assert.Contains("Invalid transaction", result.Error);
     }
+    
+    [Fact]
+    public async Task SideChain_CrossChainSideChainCreateToken_WithAlias_Test()
+    {
+        await GenerateSideChainAsync();
+        await RegisterSideChainContractAddressOnMainChainAsync();
+
+        // Main chain create token
+        await BootMinerChangeRoundAsync(AEDPoSContractStub, true);
+        var createTransaction = await CreateTransactionForNFTCreation(TokenContractStub,
+            DefaultAccount.Address, $"{NFTSymbolForTesting}-0", TokenContractAddress);
+        var blockExecutedSet = await MineAsync(new List<Transaction> { createTransaction });
+        var createResult = blockExecutedSet.TransactionResultMap[createTransaction.GetHash()];
+        Assert.True(createResult.Status == TransactionResultStatus.Mined, createResult.Error);
+
+        var createdTokenInfo = await TokenContractStub.GetTokenInfo.CallAsync(new GetTokenInfoInput
+        {
+            Symbol = $"{NFTSymbolForTesting}-0"
+        });
+        var tokenValidationTransaction = CreateTokenInfoValidationTransaction(createdTokenInfo,
+            TokenContractStub);
+
+        blockExecutedSet = await MineAsync(new List<Transaction> { tokenValidationTransaction });
+        var merklePath = GetTransactionMerklePathAndRoot(tokenValidationTransaction, out var blockRoot);
+        await IndexMainChainTransactionAsync(blockExecutedSet.Height, blockRoot, blockRoot);
+        var crossChainCreateTokenInput = new CrossChainCreateTokenInput
+        {
+            FromChainId = MainChainId,
+            ParentChainHeight = blockExecutedSet.Height,
+            TransactionBytes = tokenValidationTransaction.ToByteString(),
+            MerklePath = merklePath
+        };
+        // Side chain cross chain create
+        var executionResult =
+            await SideChainTokenContractStub.CrossChainCreateToken.SendAsync(crossChainCreateTokenInput);
+        executionResult.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined,
+            executionResult.TransactionResult.Error);
+
+        var newTokenInfo = await SideChainTokenContractStub.GetTokenInfo.CallAsync(new GetTokenInfoInput
+        {
+            Symbol = $"{NFTSymbolForTesting}-0"
+        });
+        newTokenInfo.TotalSupply.ShouldBe(_totalSupply);
+
+        var alias = await SideChainTokenContractStub.GetTokenAlias.CallAsync(new StringValue
+        {
+            Value = $"{NFTSymbolForTesting}-{1}"
+        });
+        alias.Value.ShouldBe(NFTSymbolForTesting);
+    }
+
+    [Fact]
+    public async Task SideChain_CrossChainSideChainCreateToken_SetAliasAndSyncAgain_Test()
+    {
+        await GenerateSideChainAsync();
+        await RegisterSideChainContractAddressOnMainChainAsync();
+
+        // Main chain create token
+        await BootMinerChangeRoundAsync(AEDPoSContractStub, true);
+        var createTransaction = await CreateTransactionForNFTCreation(TokenContractStub,
+            DefaultAccount.Address, $"{NFTSymbolForTesting}-0", TokenContractAddress, false);
+        var blockExecutedSet = await MineAsync(new List<Transaction> { createTransaction });
+        var createResult = blockExecutedSet.TransactionResultMap[createTransaction.GetHash()];
+        Assert.True(createResult.Status == TransactionResultStatus.Mined, createResult.Error);
+
+        // Sync for the first time
+        {
+            var createdTokenInfo = await TokenContractStub.GetTokenInfo.CallAsync(new GetTokenInfoInput
+            {
+                Symbol = $"{NFTSymbolForTesting}-0"
+            });
+            var tokenValidationTransaction = CreateTokenInfoValidationTransaction(createdTokenInfo,
+                TokenContractStub);
+
+            blockExecutedSet = await MineAsync(new List<Transaction> { tokenValidationTransaction });
+            var merklePath = GetTransactionMerklePathAndRoot(tokenValidationTransaction, out var blockRoot);
+            await IndexMainChainTransactionAsync(blockExecutedSet.Height, blockRoot, blockRoot);
+            var crossChainCreateTokenInput = new CrossChainCreateTokenInput
+            {
+                FromChainId = MainChainId,
+                ParentChainHeight = blockExecutedSet.Height,
+                TransactionBytes = tokenValidationTransaction.ToByteString(),
+                MerklePath = merklePath
+            };
+            // Side chain cross chain create
+            var executionResult =
+                await SideChainTokenContractStub.CrossChainCreateToken.SendAsync(crossChainCreateTokenInput);
+            executionResult.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined,
+                executionResult.TransactionResult.Error);
+        }
+
+        // Set Alias
+        {
+            var setAliasTransaction = await TokenContractStub.SetSymbolAlias.SendAsync(new SetSymbolAliasInput
+            {
+                Symbol = $"{NFTSymbolForTesting}-1",
+                Alias = NFTSymbolForTesting
+            });
+            var setAliasResult = setAliasTransaction.TransactionResult;
+            setAliasResult.Status.ShouldBe(TransactionResultStatus.Mined);
+        }
+
+        // Sync for the second time
+        {
+            var createdTokenInfo = await TokenContractStub.GetTokenInfo.CallAsync(new GetTokenInfoInput
+            {
+                Symbol = $"{NFTSymbolForTesting}-0"
+            });
+            var tokenValidationTransaction = CreateTokenInfoValidationTransaction(createdTokenInfo,
+                TokenContractStub);
+
+            blockExecutedSet = await MineAsync(new List<Transaction> { tokenValidationTransaction });
+            var merklePath = GetTransactionMerklePathAndRoot(tokenValidationTransaction, out var blockRoot);
+            await IndexMainChainTransactionAsync(blockExecutedSet.Height, blockRoot, blockRoot);
+            var crossChainCreateTokenInput = new CrossChainCreateTokenInput
+            {
+                FromChainId = MainChainId,
+                ParentChainHeight = blockExecutedSet.Height,
+                TransactionBytes = tokenValidationTransaction.ToByteString(),
+                MerklePath = merklePath
+            };
+            // Side chain cross chain create
+            var executionResult =
+                await SideChainTokenContractStub.CrossChainCreateToken.SendAsync(crossChainCreateTokenInput);
+            executionResult.TransactionResult.Status.ShouldBe(TransactionResultStatus.Mined,
+                executionResult.TransactionResult.Error);
+        }
+
+        var newTokenInfo = await SideChainTokenContractStub.GetTokenInfo.CallAsync(new GetTokenInfoInput
+        {
+            Symbol = $"{NFTSymbolForTesting}-0"
+        });
+        newTokenInfo.TotalSupply.ShouldBe(_totalSupply);
+
+        var alias = await SideChainTokenContractStub.GetTokenAlias.CallAsync(new StringValue
+        {
+            Value = $"{NFTSymbolForTesting}-1"
+        });
+        alias.Value.ShouldBe(NFTSymbolForTesting);
+    }
 
     #endregion
 
@@ -437,8 +580,8 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
     [Fact]
     public async Task MainChain_CrossChainTransfer_Without_Burnable_Token_Test()
     {
-        var createTransaction = CreateTransactionForTokenCreation(TokenContractStub,
-            DefaultAccount.Address, SymbolForTesting, false);
+        var createTransaction = await CreateTransactionForTokenCreation(TokenContractStub,
+            DefaultAccount.Address, SymbolForTesting, TokenContractAddress, false);
         var blockExecutedSet = await MineAsync(new List<Transaction> { createTransaction });
         var createResult = blockExecutedSet.TransactionResultMap[createTransaction.GetHash()];
         Assert.True(createResult.Status == TransactionResultStatus.Mined, createResult.Error);
@@ -471,8 +614,8 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
 
         // Main chain create token
         await BootMinerChangeRoundAsync(AEDPoSContractStub, true);
-        var createTransaction = CreateTransactionForTokenCreation(TokenContractStub,
-            DefaultAccount.Address, SymbolForTesting);
+        var createTransaction = await CreateTransactionForTokenCreation(TokenContractStub,
+            DefaultAccount.Address, SymbolForTesting, TokenContractAddress);
         var executedSet = await MineAsync(new List<Transaction> { createTransaction });
         var createResult = executedSet.TransactionResultMap[createTransaction.GetHash()];
         Assert.True(createResult.Status == TransactionResultStatus.Mined, createResult.Error);
@@ -488,6 +631,7 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
                 Symbol = createdTokenInfo.Symbol,
                 Decimals = createdTokenInfo.Decimals,
                 Issuer = createdTokenInfo.Issuer,
+                Owner = createdTokenInfo.Issuer,
                 IsBurnable = createdTokenInfo.IsBurnable,
                 TotalSupply = createdTokenInfo.TotalSupply,
                 IssueChainId = createdTokenInfo.IssueChainId
@@ -648,7 +792,21 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
             TransferTransactionBytes = crossChainTransferTransaction.ToByteString(),
             MerklePath = transferMerKlePath
         };
-        await SideChainTokenContractStub.CrossChainReceiveToken.SendAsync(crossChainReceiveTokenInput);
+        var receiveResult =
+            await SideChainTokenContractStub.CrossChainReceiveToken.SendAsync(crossChainReceiveTokenInput);
+
+        var logEvent = receiveResult.TransactionResult.Logs.First(l => l.Name == nameof(CrossChainReceived));
+        var receivedEvent = new CrossChainReceived();
+        receivedEvent.MergeFrom(logEvent.NonIndexed);
+        receivedEvent.From.ShouldBe(SideChainTestKit.DefaultAccount.Address);
+        receivedEvent.To.ShouldBe(SideChainTestKit.DefaultAccount.Address);
+        receivedEvent.Symbol.ShouldBe(NativeToken);
+        receivedEvent.Amount.ShouldBe(1000);
+        receivedEvent.Memo.ShouldBeEmpty();
+        receivedEvent.FromChainId.ShouldBe(MainChainId);
+        receivedEvent.ParentChainHeight.ShouldBe(height);
+        receivedEvent.IssueChainId.ShouldBe(MainChainId);
+        receivedEvent.TransferTransactionId.ShouldBe(crossChainTransferTransaction.GetHash());
 
         var output = await SideChainTokenContractStub.GetBalance.CallAsync(new GetBalanceInput
         {
@@ -710,8 +868,8 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
         await RegisterMainChainTokenContractAddressOnSideChainAsync(sideChainId);
         var transferAmount = 1000;
 
-        var createTransaction = CreateTransactionForTokenCreation(TokenContractStub,
-            DefaultAccount.Address, SymbolForTesting);
+        var createTransaction = await CreateTransactionForTokenCreation(TokenContractStub,
+            DefaultAccount.Address, SymbolForTesting, TokenContractAddress);
         var executedSet = await MineAsync(new List<Transaction> { createTransaction });
         var createResult = executedSet.TransactionResultMap[createTransaction.GetHash()];
         createResult.Status.ShouldBe(TransactionResultStatus.Mined, createResult.Error);
@@ -754,7 +912,7 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
     }
 
     [Fact]
-    public async Task SideChain_CrossChainReceived_WrongReceiver_Test()
+    public async Task SideChain_CrossChainReceived_DifferentReceiver_Test()
     {
         var sideChainId = await GenerateSideChainAsync();
         await RegisterSideChainContractAddressOnMainChainAsync();
@@ -788,17 +946,16 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
             SideTokenContractAddress,
             SampleAccount.Accounts[2].KeyPair);
         var executionResult =
-            await tokenContractImplStub.CrossChainReceiveToken.SendWithExceptionAsync(crossChainReceiveTokenInput);
-        Assert.True(executionResult.TransactionResult.Status == TransactionResultStatus.Failed);
-        Assert.Contains("Unable to claim cross chain token.", executionResult.TransactionResult.Error);
+            await tokenContractImplStub.CrossChainReceiveToken.SendAsync(crossChainReceiveTokenInput);
+        Assert.True(executionResult.TransactionResult.Status == TransactionResultStatus.Mined);
     }
 
     [Fact]
     public async Task CrossChainCreateToken_WithoutRegister_Test()
     {
         await GenerateSideChainAsync(false);
-        var createTransaction = CreateTransactionForTokenCreation(TokenContractStub,
-            DefaultAccount.Address, SymbolForTesting);
+        var createTransaction = await CreateTransactionForTokenCreation(TokenContractStub,
+            DefaultAccount.Address, SymbolForTesting, TokenContractAddress);
         var blockExecutedSet = await MineAsync(new List<Transaction> { createTransaction });
         var createResult = blockExecutedSet.TransactionResultMap[createTransaction.GetHash()];
         Assert.True(createResult.Status == TransactionResultStatus.Mined, createResult.Error);
@@ -859,35 +1016,82 @@ public class MultiTokenContractCrossChainTest : MultiTokenContractCrossChainTest
     }
 
 
-    private Transaction CreateTransactionForTokenCreation(
+    private async Task<Transaction> CreateTransactionForTokenCreation(
         TokenContractImplContainer.TokenContractImplStub tokenContractImplStub,
-        Address issuer, string symbol, bool isBurnable = true)
+        Address issuer, string symbol, Address lockWhiteAddress, bool isBurnable = true)
     {
+        await CreateSeedNftCollection(tokenContractImplStub, issuer);
         var tokenInfo = GetTokenInfo(symbol, issuer, isBurnable);
-        return tokenContractImplStub.Create.GetTransaction(new CreateInput
+        var input = new CreateInput
         {
             Symbol = tokenInfo.Symbol,
             Decimals = tokenInfo.Decimals,
             Issuer = tokenInfo.Issuer,
+            Owner = tokenInfo.Issuer,
             IsBurnable = tokenInfo.IsBurnable,
             TokenName = tokenInfo.TokenName,
             TotalSupply = tokenInfo.TotalSupply
-        });
+        };
+        await CreateSeedNftAsync(tokenContractImplStub, input, lockWhiteAddress);
+        return tokenContractImplStub.Create.GetTransaction(input);
     }
+    
+    private async Task<Transaction> CreateTransactionForNFTCreation(
+        TokenContractImplContainer.TokenContractImplStub tokenContractImplStub,
+        Address issuer, string symbol, Address lockWhiteAddress, bool withAlias = true)
+    {
+        await CreateSeedNftCollection(tokenContractImplStub, issuer);
+        var tokenInfo = GetTokenInfo(symbol, issuer);
+        var input = new CreateInput
+        {
+            Symbol = tokenInfo.Symbol,
+            Decimals = 0,
+            Issuer = tokenInfo.Issuer,
+            Owner = tokenInfo.Issuer,
+            IsBurnable = tokenInfo.IsBurnable,
+            TokenName = tokenInfo.TokenName,
+            TotalSupply = tokenInfo.TotalSupply,
+        };
+        if (withAlias)
+        {
+            input.ExternalInfo = new ExternalInfo
+            {
+                Value =
+                {
+                    {
+                        TokenAliasExternalInfoKey, JsonSerializer.Serialize(new Dictionary<string, string>
+                        {
+                            { $"{NFTSymbolForTesting}-{1}", NFTSymbolForTesting }
+                        })
+                    }
+                }
+            };
+        }
+
+        await CreateSeedNftAsync(tokenContractImplStub, input, lockWhiteAddress);
+        return tokenContractImplStub.Create.GetTransaction(input);
+    }
+
 
     private Transaction CreateTokenInfoValidationTransaction(TokenInfo createdTokenInfo,
         TokenContractImplContainer.TokenContractImplStub tokenContractImplStub)
     {
-        return tokenContractImplStub.ValidateTokenInfoExists.GetTransaction(new ValidateTokenInfoExistsInput
+        var input = new ValidateTokenInfoExistsInput
         {
             TokenName = createdTokenInfo.TokenName,
             Symbol = createdTokenInfo.Symbol,
             Decimals = createdTokenInfo.Decimals,
             Issuer = createdTokenInfo.Issuer,
+            Owner = createdTokenInfo.Issuer,
             IsBurnable = createdTokenInfo.IsBurnable,
             TotalSupply = createdTokenInfo.TotalSupply,
             IssueChainId = createdTokenInfo.IssueChainId
-        });
+        };
+        if (createdTokenInfo.ExternalInfo != null)
+        {
+            input.ExternalInfo.Add(createdTokenInfo.ExternalInfo.Value);
+        }
+        return tokenContractImplStub.ValidateTokenInfoExists.GetTransaction(input);
     }
 
     private TokenInfo GetTokenInfo(string symbol, Address issuer, bool isBurnable = true)
