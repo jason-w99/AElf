@@ -73,32 +73,6 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
         var blockHeight = block.Height;
         var blockTime = block.Header.Time.ToDateTime();
         BlockEto blockEto = _transformEtoHelper.ToBlockEtoAsync(block);
-        /*BlockEto blockEto = new BlockEto()
-        {
-            ChainId = ChainHelper.ConvertChainIdToBase58(block.Header.ChainId),
-            Height=blockHeight,
-            BlockHash=blockHashStr,
-            BlockHeight= blockHeight,
-            PreviousBlockId=block.Header.PreviousBlockHash,
-            PreviousBlockHash= block.Header.PreviousBlockHash.ToHex(),
-            BlockTime=blockTime,
-            SignerPubkey=block.Header.SignerPubkey.ToByteArray().ToHex(false),
-            Signature=block.Header.Signature.ToHex(),
-        };
-        //blockEto's extra properties
-        
-        Dictionary<string, string> blockExtraProperties = new Dictionary<string, string>();
-        blockExtraProperties.Add("Version",block.Header.Version.ToString());
-        blockExtraProperties.Add("Bloom",block.Header.Bloom.Length == 0
-            ? ByteString.CopyFrom(new byte[256]).ToBase64()
-            : block.Header.Bloom.ToBase64());        
-        blockExtraProperties.Add("ExtraData",block.Header.ExtraData.ToString());
-        blockExtraProperties.Add("MerkleTreeRootOfTransactions",block.Header.MerkleTreeRootOfTransactions.ToHex());
-        blockExtraProperties.Add("MerkleTreeRootOfWorldState",block.Header.MerkleTreeRootOfWorldState.ToHex());
-        blockExtraProperties.Add("BlockSize",block.CalculateSize().ToString());
-        
-        blockEto.ExtraProperties = blockExtraProperties;*/
-        //blockEto.SetVersion();
         List<TransactionEto> transactions = new List<TransactionEto>();
         int transactionIndex = 0;
         int eventIndex = 0;
@@ -125,60 +99,7 @@ public class BlockChainDataEtoGenerator : IBlockChainDataEtoGenerator
             }
             TransactionEto transactionEto =
                 _transformEtoHelper.ToTransactionEtoAsync(transaction, transactionResult, transactionIndex,eventIndex, txId.ToHex(),block.Header.Version.ToString());
-
-            /*TransactionEto transactionEto = new TransactionEto()
-            {
-                TransactionId = txId.ToHex(),
-                From = transaction.From.ToBase58(),
-                To = transaction.To.ToBase58(),
-                MethodName= transaction.MethodName,
-                Params=transaction.Params.ToBase64(),
-                Signature=transaction.Signature.ToBase64(),
-                Status=transactionResult.Status,
-                Index = transactionIndex
-            };
             transactionIndex += 1;
-            //TransactionEto's  extra properties
-            Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
-            transactionExtraProperties.Add("Version",block.Header.Version.ToString());
-            transactionExtraProperties.Add("RefBlockNumber",transaction.RefBlockNumber.ToString());
-            transactionExtraProperties.Add("RefBlockPrefix",transaction.RefBlockPrefix.ToBase64());
-            //transactionExtraProperties.Add("Bloom",transactionResult.Bloom.ToBase64());
-            transactionExtraProperties.Add("Bloom",transactionResult.Status == TransactionResultStatus.NotExisted
-                ? null
-                : transactionResult.Bloom.Length == 0
-                    ? ByteString.CopyFrom(new byte[256]).ToBase64()
-                    : transactionResult.Bloom.ToBase64());
-            transactionExtraProperties.Add("ReturnValue",transactionResult.ReturnValue.ToHex());
-            transactionExtraProperties.Add("Error",transactionResult.Error);
-            transactionExtraProperties.Add("TransactionSize",transaction.CalculateSize().ToString());
-            transactionExtraProperties.Add("TransactionFee", JsonConvert.SerializeObject(transactionResult.GetChargedTransactionFees()));
-            transactionExtraProperties.Add("ResourceFee", JsonConvert.SerializeObject(transactionResult.GetConsumedResourceTokens()));
-
-            transactionEto.ExtraProperties = transactionExtraProperties;  
-
-            List<LogEventEto> logEvents = new List<LogEventEto>();
-            
-            foreach (var logEvent in transactionResult.Logs)
-            {
-     
-                LogEventEto logEventEto = new LogEventEto()
-                {
-                    ContractAddress=logEvent.Address.ToBase58(),
-                    EventName=logEvent.Name,
-                    Index =eventIndex
-                    
-                };
-                //logEventEto's  extra properties
-                Dictionary<string, string> logEventEtoExtraProperties = new Dictionary<string, string>();
-                logEventEtoExtraProperties.Add("Indexed",logEvent.Indexed.ToString());
-                logEventEtoExtraProperties.Add("NonIndexed",logEvent.NonIndexed.ToBase64());
-                logEventEto.ExtraProperties = logEventEtoExtraProperties;
-               
-                logEvents.Add(logEventEto);
-                eventIndex += 1;
-            }
-            transactionEto.LogEvents = logEvents;*/
             transactions.Add(transactionEto);
         }
         blockEto.Transactions = transactions;

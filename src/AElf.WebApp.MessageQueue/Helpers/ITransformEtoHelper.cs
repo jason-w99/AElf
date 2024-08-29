@@ -66,7 +66,6 @@ public class TransformEtoHelper : ITransformEtoHelper
             Index = transactionIndex
 
         };
-        transactionIndex += 1;
         //TransactionEto's  extra properties
         Dictionary<string, string> transactionExtraProperties = new Dictionary<string, string>();
         transactionExtraProperties.Add("Version",blockVersion);
