@@ -56,16 +56,14 @@ public class MessageQueueAElfModule : AElfModule
          Configure<AbpDistributedCacheOptions>(options => { options.KeyPrefix = "EventFilterApp:"; });
      }
 
-    public override void OnApplicationInitialization(ApplicationInitializationContext context)
-    {
-        AsyncHelper.RunSync(() => OnApplicationInitializationAsync(context));
-    }
-
-    public override async Task OnApplicationInitializationAsync(ApplicationInitializationContext context)
-    {
-        var syncBlockStateProvider = context.ServiceProvider.GetRequiredService<ISyncBlockStateProvider>();
-        await syncBlockStateProvider.InitializeAsync();
-    }
+     public override void OnPreApplicationInitialization(ApplicationInitializationContext context)
+     {
+         AsyncHelper.RunSync(async () =>
+         {
+             var syncBlockStateProvider = context.ServiceProvider.GetRequiredService<ISyncBlockStateProvider>();
+             await syncBlockStateProvider.InitializeAsync();
+         });
+     }
 
     public override void OnApplicationShutdown(ApplicationShutdownContext context)
     {
