@@ -15,6 +15,7 @@ using AElf.ContractTestKit.AEDPoSExtension;
 using AElf.EconomicSystem;
 using AElf.GovernmentSystem;
 using AElf.Kernel;
+using AElf.Kernel.Configuration;
 using AElf.Kernel.Consensus;
 using AElf.Kernel.Proposal;
 using AElf.Kernel.Token;
@@ -74,15 +75,20 @@ public class AEDPoSExtensionDemoTestBase : AEDPoSExtensionTestBase
             ParliamentSmartContractAddressNameProvider.Name,
             ElectionSmartContractAddressNameProvider.Name,
             AssociationSmartContractAddressNameProvider.Name,
-            ReferendumSmartContractAddressNameProvider.Name
+            ReferendumSmartContractAddressNameProvider.Name,
+            ConfigurationSmartContractAddressNameProvider.Name,
         }));
     }
 
     internal void InitialAcs3Stubs()
     {
         foreach (var initialKeyPair in MissionedECKeyPairs.InitialKeyPairs)
-            ParliamentStubs.Add(GetTester<ParliamentContractImplContainer.ParliamentContractImplStub>(
-                ContractAddresses[ParliamentSmartContractAddressNameProvider.Name], initialKeyPair));
+        {
+            var parliamentStub = GetTester<ParliamentContractImplContainer.ParliamentContractImplStub>(
+                ContractAddresses[ParliamentSmartContractAddressNameProvider.Name], initialKeyPair);
+
+            ParliamentStubs.Add(parliamentStub);
+        }
     }
 
     internal async Task<RandomNumberProviderContractContainer.RandomNumberProviderContractStub>
@@ -115,6 +121,23 @@ public class AEDPoSExtensionDemoTestBase : AEDPoSExtensionTestBase
         await BlockMiningService.MineBlockAsync(approvals);
 
         await ParliamentStubs.First().Release.SendAsync(proposalId);
+    }
+    
+    internal async Task<TransactionResult> ParliamentReachAnAgreementWithExceptionAsync(CreateProposalInput createProposalInput)
+    {
+        var createProposalTx = ParliamentStubs.First().CreateProposal.GetTransaction(createProposalInput);
+        await BlockMiningService.MineBlockAsync(new List<Transaction>
+        {
+            createProposalTx
+        });
+        var proposalId = new Hash();
+        proposalId.MergeFrom(TransactionTraceProvider.GetTransactionTrace(createProposalTx.GetHash()).ReturnValue);
+        var approvals = new List<Transaction>();
+        foreach (var stub in ParliamentStubs) approvals.Add(stub.Approve.GetTransaction(proposalId));
+
+        await BlockMiningService.MineBlockAsync(approvals);
+
+        return (await ParliamentStubs.First().Release.SendWithExceptionAsync(proposalId)).TransactionResult;
     }
 
     internal void SetToSideChain()

@@ -148,7 +148,7 @@ public class CSharpSmartContractContext : ISmartContractBridgeContext
     {
         SmartContractBridgeContextImplementation.DeployContract(address, registration, name);
     }
-
+    
     /// <summary>
     ///     Update a smart contract (only the genesis contract can call it).
     /// </summary>
@@ -158,6 +158,20 @@ public class CSharpSmartContractContext : ISmartContractBridgeContext
     public void UpdateContract(Address address, SmartContractRegistration registration, Hash name)
     {
         SmartContractBridgeContextImplementation.UpdateContract(address, registration, name);
+    }
+    
+    public ContractInfoDto DeploySmartContract(Address address, SmartContractRegistration registration, Hash name)
+    {
+        return SmartContractBridgeContextImplementation.DeploySmartContract(address,registration,name);
+    }
+    public ContractInfoDto UpdateSmartContract(Address address, SmartContractRegistration registration, Hash name,string previousContractVersion)
+    {
+        return SmartContractBridgeContextImplementation.UpdateSmartContract(address,registration,name,previousContractVersion);
+    }
+
+    public ContractVersionCheckDto CheckContractVersion(string previousContractVersion, SmartContractRegistration registration)
+    {
+        return SmartContractBridgeContextImplementation.CheckContractVersion(previousContractVersion, registration);
     }
 
     /// <summary>
@@ -207,6 +221,13 @@ public class CSharpSmartContractContext : ISmartContractBridgeContext
         SmartContractBridgeContextImplementation.SendVirtualInline(fromVirtualAddress, toAddress, methodName,
             args);
     }
+    
+    public void SendVirtualInline(Hash fromVirtualAddress, Address toAddress, string methodName, ByteString args,bool logTransaction)
+    {
+        SmartContractBridgeContextImplementation.SendVirtualInline(fromVirtualAddress, toAddress, methodName,
+            args,logTransaction);
+    }
+    
 
     /// <summary>
     ///     Sends a virtual inline transaction to another contract. This method is only available to system smart contract.
@@ -223,6 +244,13 @@ public class CSharpSmartContractContext : ISmartContractBridgeContext
     {
         SmartContractBridgeContextImplementation.SendVirtualInlineBySystemContract(fromVirtualAddress, toAddress,
             methodName, args);
+    }
+    
+    public void SendVirtualInlineBySystemContract(Hash fromVirtualAddress, Address toAddress, string methodName,
+        ByteString args, bool logTransaction)
+    {
+        SmartContractBridgeContextImplementation.SendVirtualInlineBySystemContract(fromVirtualAddress, toAddress,
+            methodName, args, logTransaction);
     }
 
     /// <summary>
@@ -357,5 +385,10 @@ public class CSharpSmartContractContext : ISmartContractBridgeContext
     {
         return SmartContractBridgeContextImplementation.ConvertVirtualAddressToContractAddressWithContractHashName(
             virtualAddress);
+    }
+    
+    public bool ECVrfVerify(byte[] pubKey, byte[] alpha, byte[] pi, out byte[] beta)
+    {
+        return SmartContractBridgeContextImplementation.ECVrfVerify(pubKey, alpha, pi, out beta);
     }
 }

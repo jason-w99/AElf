@@ -241,7 +241,9 @@ public partial class ParliamentContract : ParliamentContractImplContainer.Parlia
             ToBeReleased = Validate(proposal) && IsReleaseThresholdReached(proposal, organization),
             ApprovalCount = proposal.Approvals.Count,
             RejectionCount = proposal.Rejections.Count,
-            AbstentionCount = proposal.Abstentions.Count
+            AbstentionCount = proposal.Abstentions.Count,
+            Title = proposal.Title,
+            Description = proposal.Description
         };
     }
 
@@ -306,6 +308,37 @@ public partial class ParliamentContract : ParliamentContractImplContainer.Parlia
                 continue;
             var organization = State.Organizations[proposal.OrganizationAddress];
             if (organization == null || !IsProposalStillPending(proposal, organization, currentParliament))
+                continue;
+            result.ProposalIds.Add(proposalId);
+        }
+
+        return result;
+    }
+
+    public override ProposalIdList GetReleaseThresholdReachedProposals(ProposalIdList input)
+    {
+        var result = new ProposalIdList();
+        foreach (var proposalId in input.ProposalIds)
+        {
+            var proposal = State.Proposals[proposalId];
+            if (proposal == null || !Validate(proposal))
+                continue;
+            var organization = State.Organizations[proposal.OrganizationAddress];
+            if (organization == null || !IsReleaseThresholdReached(proposal, organization))
+                continue;
+            result.ProposalIds.Add(proposalId);
+        }
+
+        return result;
+    }
+    
+    public override ProposalIdList GetAvailableProposals(ProposalIdList input)
+    {
+        var result = new ProposalIdList();
+        foreach (var proposalId in input.ProposalIds)
+        {
+            var proposal = State.Proposals[proposalId];
+            if (proposal == null || !Validate(proposal))
                 continue;
             result.ProposalIds.Add(proposalId);
         }

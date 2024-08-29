@@ -169,6 +169,8 @@ public class AssociationContractTests : AssociationContractTestBase<AssociationC
             getProposal.Output.OrganizationAddress.ShouldBe(organizationAddress);
             getProposal.Output.ToAddress.ShouldBe(TokenContractAddress);
             getProposal.Output.Params.ShouldBe(transferInput.ToByteString());
+            getProposal.Output.Title.ShouldNotBeNullOrEmpty();
+            getProposal.Output.Description.ShouldNotBeNullOrEmpty();
         }
     }
 
@@ -943,13 +945,22 @@ public class AssociationContractTests : AssociationContractTestBase<AssociationC
             var tokenSymbol = "DLS";
             var invalidMethodFees = GetValidMethodFees();
             invalidMethodFees.Fees[0].Symbol = tokenSymbol;
-            await TokenContractStub.Create.SendAsync(new CreateInput
-            {
-                Symbol = tokenSymbol,
-                TokenName = "name",
-                Issuer = DefaultSender,
-                TotalSupply = 1000_000
-            });
+            
+            var defaultOrganization = await ParliamentContractStub.GetDefaultOrganizationAddress.CallAsync(new Empty());
+
+            var proposalId = await CreateFeeProposalAsync(TokenContractAddress,
+                defaultOrganization, nameof(TokenContractStub.Create), new CreateInput
+                {
+                    Symbol = tokenSymbol,
+                    TokenName = "name",
+                    Issuer = DefaultSender,
+                    TotalSupply = 1000_000,
+                    Owner = DefaultSender,
+                });
+
+            await ApproveWithMinersAsync(proposalId);
+            await ParliamentContractStub.Release.SendAsync(proposalId);
+            
             var ret = await AssociationContractStub.SetMethodFee.SendWithExceptionAsync(invalidMethodFees);
             ret.TransactionResult.Error.ShouldContain($"Token {tokenSymbol} cannot set as method fee.");
         }
@@ -1222,7 +1233,9 @@ public class AssociationContractTests : AssociationContractTestBase<AssociationC
             ToAddress = TokenContractAddress,
             Params = transferInput.ToByteString(),
             ExpiredTime = BlockTimeProvider.GetBlockTime().AddDays(2),
-            OrganizationAddress = organizationAddress
+            OrganizationAddress = organizationAddress,
+            Title = "Token Transfer",
+            Description = "Transfer 100 ELF to Reviewer1's address",
         };
         var proposal = await associationContractStub.CreateProposal.SendAsync(createProposalInput);
         var proposalCreated = ProposalCreated.Parser.ParseFrom(proposal.TransactionResult.Logs

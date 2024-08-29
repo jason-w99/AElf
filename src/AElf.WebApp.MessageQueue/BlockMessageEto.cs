@@ -33,7 +33,7 @@ public class TransactionMessageEto
     public string ToAddress { get; set; }
 }
 
-public class LogEventEto
+/*public class LogEventEto
 {
     public string Address { get; set; }
 
@@ -42,4 +42,4 @@ public class LogEventEto
     public string[] Indexed { get; set; }
 
     public string NonIndexed { get; set; }
-}
+}*/

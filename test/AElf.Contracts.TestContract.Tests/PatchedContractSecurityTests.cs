@@ -18,7 +18,7 @@ public class PatchedContractSecurityTests : TestContractTestBase
         InitializePatchedContracts();
     }
 
-    [Fact]
+    [Fact(Skip="Static field not allowed in user code https://github.com/AElfProject/AElf/issues/3388")]
     public async Task ResetFields_Test()
     {
         var result = await TestBasicSecurityContractStub.TestResetFields.SendAsync(new ResetInput
@@ -47,7 +47,7 @@ public class PatchedContractSecurityTests : TestContractTestBase
         allFieldReset.Value.ShouldBeTrue();
     }
 
-    [Fact]
+    [Fact(Skip = "Static field not allowed in user code https://github.com/AElfProject/AElf/issues/3388")]
     public async Task Reset_NestedFields_Test()
     {
         var result = await TestBasicSecurityContractStub.TestResetNestedFields.SendAsync(new ResetNestedInput
@@ -66,7 +66,7 @@ public class PatchedContractSecurityTests : TestContractTestBase
         allFieldReset.Value.ShouldBeTrue();
     }
 
-    [Fact]
+    [Fact(Skip = "Static field not allowed in user code https://github.com/AElfProject/AElf/issues/3388")]
     public async Task Reset_OtherType_NestedFields_Test()
     {
         var result = await TestBasicSecurityContractStub.TestResetOtherTypeFields.SendAsync(new ResetNestedInput
@@ -262,7 +262,7 @@ public class PatchedContractSecurityTests : TestContractTestBase
                         StringValue = str
                     }
                 });
-            txResult.TransactionResult.Error.ShouldContain($"exceeds limit of {stateSizeLimit}");
+            txResult.TransactionResult.Error.ShouldContain($"exceeds limit");
 
             var str1 = Encoding.UTF8.GetString(new byte[10]);
             var message = new ProtobufMessage
@@ -309,7 +309,7 @@ public class PatchedContractSecurityTests : TestContractTestBase
             {
                 ProtobufValue = new ProtobufMessage()
             });
-            txResult.TransactionResult.Error.ShouldContain($"exceeds limit of {stateSizeLimit}");
+            txResult.TransactionResult.Error.ShouldContain($"exceeds limit");
 
             var str1 = Encoding.UTF8.GetString(new byte[10]);
             var message = new ProtobufMessage

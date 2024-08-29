@@ -22,7 +22,6 @@ using AElf.OS.Node.Domain;
 using AElf.Runtime.CSharp;
 using AElf.RuntimeSetup;
 using AElf.WebApp.Application.Chain;
-using AElf.WebApp.MessageQueue;
 using AElf.WebApp.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,9 +56,7 @@ namespace AElf.Blockchains.BasicBaseChain;
     //plugin
     typeof(ExecutionPluginForMethodFeeModule),
     typeof(ExecutionPluginForResourceFeeModule),
-    typeof(ExecutionPluginForCallThresholdModule),
-    
-    typeof(MessageQueueAElfModule)
+    typeof(ExecutionPluginForCallThresholdModule)
 )]
 public class BasicBaseChainAElfModule : AElfModule
 {

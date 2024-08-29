@@ -62,7 +62,7 @@ public partial class ElectionContract
         if (diff > 0)
         {
             victories =
-                new List<ByteString>(validCandidates.Select(ByteStringHelper.FromHexString));
+                new List<ByteString>(validCandidates.Select(v => ByteStringHelper.FromHexString(v)));
             var backups = currentMiners.Where(k => !validCandidates.Contains(k)).ToList();
             if (State.InitialMiners.Value != null)
                 backups.AddRange(
@@ -70,7 +70,8 @@ public partial class ElectionContract
 
             victories.AddRange(backups.OrderBy(p => p)
                 .Take(Math.Min(diff, currentMiners.Count))
-                .Select(ByteStringHelper.FromHexString));
+                // ReSharper disable once ConvertClosureToMethodGroup
+                .Select(v => ByteStringHelper.FromHexString(v)));
             Context.LogDebug(() => string.Join("\n", victories.Select(v => v.ToHex().Substring(0, 10)).ToList()));
             return victories;
         }
@@ -161,20 +162,16 @@ public partial class ElectionContract
 
     public override ElectorVote GetElectorVote(StringValue input)
     {
-        return State.ElectorVotes[input.Value] ?? new ElectorVote
-        {
-            Pubkey = ByteStringHelper.FromHexString(input.Value)
-        };
+        return GetElectorVote(input.Value);
     }
 
     public override ElectorVote GetElectorVoteWithRecords(StringValue input)
     {
-        var votes = State.ElectorVotes[input.Value];
-        if (votes == null)
-            return new ElectorVote
-            {
-                Pubkey = ByteStringHelper.FromHexString(input.Value)
-            };
+        var votes = GetElectorVote(input.Value);
+        
+        if (votes.Address == null && votes.Pubkey == null)
+            return votes;
+        
         var votedRecords = State.VoteContract.GetVotingRecords.Call(new GetVotingRecordsInput
         {
             Ids = { votes.ActiveVotingRecordIds }
@@ -187,6 +184,21 @@ public partial class ElectionContract
         }
 
         return votes;
+    }
+
+    private ElectorVote GetElectorVote(string value)
+    {
+        Assert(value != null && value.Length > 1, "Invalid input.");
+        
+        var voterVotes = State.ElectorVotes[value];
+
+        if (voterVotes == null && !AddressHelper.VerifyFormattedAddress(value))
+        {
+            voterVotes = State.ElectorVotes[
+                Address.FromPublicKey(ByteArrayHelper.HexStringToByteArray(value)).ToBase58()];
+        }
+
+        return voterVotes ?? new ElectorVote();
     }
 
     public override ElectorVote GetElectorVoteWithAllRecords(StringValue input)
